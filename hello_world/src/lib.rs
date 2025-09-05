@@ -33,7 +33,8 @@ mod test {
 
         let program_keypair = Keypair::new();
         let program_id = program_keypair.pubkey();
-        svm.add_program_from_file(program_id, "target/deploy/hello_world.so").unwrap();
+        svm.add_program_from_file(program_id, "target/deploy/hello_world.so")
+            .unwrap();
 
         let instruction = Instruction {
             program_id,
@@ -50,4 +51,3 @@ mod test {
         println!("Logs: {logs:#?}");
     }
 }
-
