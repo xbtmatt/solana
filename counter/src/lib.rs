@@ -181,7 +181,8 @@ mod test {
 
         // Create transaction
         let message = Message::new(&[initialize_instruction], Some(&payer.pubkey()));
-        let transaction = Transaction::new(&[&payer, &counter_keypair], message, svm.latest_blockhash());
+        let transaction =
+            Transaction::new(&[&payer, &counter_keypair], message, svm.latest_blockhash());
 
         // Send transaction
         let result = svm.send_transaction(transaction);
@@ -218,7 +219,8 @@ mod test {
 
         // Create transaction
         let message = Message::new(&[increment_instruction], Some(&payer.pubkey()));
-        let transaction = Transaction::new(&[&payer, &counter_keypair], message, svm.latest_blockhash());
+        let transaction =
+            Transaction::new(&[&payer, &counter_keypair], message, svm.latest_blockhash());
 
         // Send transaction
         let result = svm.send_transaction(transaction);
@@ -238,4 +240,3 @@ mod test {
         println!("Counter incremented successfully to: {}", counter.count);
     }
 }
-
