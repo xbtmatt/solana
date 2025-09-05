@@ -1,4 +1,4 @@
-use counter_program::CounterInstruction;
+use counter::CounterInstruction;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
@@ -13,7 +13,7 @@ use std::str::FromStr;
 #[tokio::main]
 async fn main() {
     // Replace with your actual program ID from deployment
-    let program_id = Pubkey::from_str("AUia4JuToXDAB4gR2ZXWqJ6kDyCqn7WqunGAgw1KxdKU")
+    let program_id = Pubkey::from_str("2qXZNMSz66W6TgGwz12xfa9WmnsbyNnRSGiMY2MAriCp")
         .expect("Invalid program ID");
 
     // Connect to local cluster
@@ -92,6 +92,35 @@ async fn main() {
 
     let mut transaction =
         Transaction::new_with_payer(&[increment_instruction], Some(&payer.pubkey()));
+
+    transaction.sign(&[&payer, &counter_keypair], blockhash);
+
+    match client.send_and_confirm_transaction(&transaction) {
+        Ok(signature) => {
+            println!("Counter incremented!");
+            println!("Transaction: {}", signature);
+        }
+        Err(err) => {
+            eprintln!("Failed to increment counter: {}", err);
+        }
+    }
+
+    // custom instruction
+    // Serialize the increment instruction data
+    let increment_data = borsh::to_vec(&CounterInstruction::ConditionalCounter {
+        should_increment: true,
+        amount: 7,
+    })
+    .expect("Failed to serialize instruction");
+
+    let conditional_increment_instruction = Instruction::new_with_bytes(
+        program_id,
+        &increment_data,
+        vec![AccountMeta::new(counter_keypair.pubkey(), true)],
+    );
+
+    let mut transaction =
+        Transaction::new_with_payer(&[conditional_increment_instruction], Some(&payer.pubkey()));
 
     transaction.sign(&[&payer, &counter_keypair], blockhash);
 

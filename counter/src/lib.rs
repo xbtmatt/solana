@@ -30,6 +30,10 @@ pub fn process_instruction(
             process_initialize_counter(program_id, accounts, initial_value)?
         }
         CounterInstruction::IncrementCounter => process_increment_counter(program_id, accounts)?,
+        CounterInstruction::ConditionalCounter {
+            should_increment,
+            amount,
+        } => process_my_struct(program_id, accounts, should_increment, amount)?,
     };
     Ok(())
 }
@@ -37,8 +41,45 @@ pub fn process_instruction(
 // Instructions that our program can execute
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub enum CounterInstruction {
-    InitializeCounter { initial_value: u64 }, // variant 0
-    IncrementCounter,                         // variant 1
+    InitializeCounter { initial_value: u64 },
+    IncrementCounter,
+    ConditionalCounter { should_increment: bool, amount: u64 },
+}
+
+fn process_my_struct(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    should_increment: bool,
+    amount: u64,
+) -> ProgramResult {
+    let accounts_iter = &mut accounts.iter();
+    let counter_account = next_account_info(accounts_iter)?;
+
+    // is this really necessary? is there a reason this isn't exposed at runtime as a static
+    // variable or something? this seems very clunky for no reason
+    if counter_account.owner != program_id {
+        // it's crazy you have to lay out accounts like this- this seems like it should have been
+        // part of the core solana library
+        return Err(ProgramError::IncorrectProgramId);
+    }
+
+    // can this functionality below be composable? can I define a function above that i re-use across
+    // multiple program instructions?? since this ultimately just increments
+    // ALSO: which parts of the program are composable?
+    if should_increment {
+        let mut data = counter_account.data.borrow_mut();
+        let mut counter_data: CounterAccount = CounterAccount::try_from_slice(&data)?;
+
+        // Increment the counter value and re-serialize.
+        counter_data.count = counter_data
+            .count
+            .checked_add(amount)
+            .ok_or(ProgramError::InvalidAccountData)?;
+        counter_data.serialize(&mut &mut data[..])?;
+        msg!("Counter incremented to: {}", counter_data.count);
+    }
+
+    Ok(())
 }
 
 // Initialize a new counter account
