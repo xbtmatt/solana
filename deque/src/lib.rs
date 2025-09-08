@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs)]
 
-use solana_program::entrypoint;
+use solana_program::{declare_id, entrypoint, pubkey::Pubkey};
 
 use processor::process_instruction;
 
@@ -8,6 +8,9 @@ pub mod instructions;
 pub mod processor;
 pub mod state;
 
-// declare_id!("...address here...");
+const PROGRAM_ID_STR: &str = "2XMZLhL2aL95mjmEC3t8ocKKiku7MLM7CnqUBvci44F4";
+const PROGRAM_ID_PUBKEY: Pubkey = Pubkey::from_str_const(PROGRAM_ID_STR);
+
+declare_id!(PROGRAM_ID_STR);
 
 entrypoint!(process_instruction);

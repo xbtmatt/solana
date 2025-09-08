@@ -17,5 +17,5 @@ solana-sdk = "2.2.0"
 tokio = "1.47.1"
 
 [[example]]
-name = "example"
+name = "client"
 path = "examples/client.rs"
