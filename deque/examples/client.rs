@@ -1,4 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
+use deque::{
+    state::{Deque, DequeAccount, DequeInstruction, Link, NIL},
+    PROGRAM_ID_PUBKEY,
+};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
@@ -12,7 +16,7 @@ use std::str::FromStr;
 
 #[tokio::main]
 async fn main() {
-    let program_id = PROGRAM_ID_STR;
+    let program_id = PROGRAM_ID_PUBKEY;
 
     // Connect to local cluster
     let rpc_url = String::from("http://localhost:8899");
@@ -42,6 +46,7 @@ async fn main() {
     // Test Deque with 5 u64s
     println!("=== Testing Deque<u64, 5> ===");
     let deque_u64 = Keypair::new();
+    println!("{:#?}", deque_u64.pubkey().to_string());
     test_u64_deque(&client, &payer, &deque_u64, program_id);
 
     println!("\n=== Testing Deque<u32, 10> ===");
@@ -149,6 +154,9 @@ fn test_u64_deque(
         // In a real scenario, you'd deserialize and iterate through the deque
         // For now, just show that the account exists and has data
     }
+
+    println!("\n=== Inspecting initialized Five u64s account ===");
+    inspect_account(client, &deque_account.pubkey());
 }
 
 fn test_u32_deque(
@@ -258,6 +266,75 @@ fn test_u32_deque(
         // Expected order after all operations (conceptually):
         // Front: 70, 50, 30, (removed), 10, (removed), 20, 40, 60, 80, 90 :Back
     }
+
+    println!("\n=== Inspecting initialized Ten u32s account ===");
+    inspect_account(client, &deque_account.pubkey());
+}
+fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey) {
+    match client.get_account(account_pubkey) {
+        Ok(account) => {
+            println!("Account owner: {}", account.owner);
+            println!("Account lamports: {}", account.lamports);
+            println!("Account data length: {} bytes", account.data.len());
+            println!("Account executable: {}", account.executable);
+
+            // Display raw bytes (first 100 or so)
+            println!("\nRaw data (hex):");
+            let display_len = std::cmp::min(account.data.len(), 100);
+            for (i, chunk) in account.data[..display_len].chunks(16).enumerate() {
+                print!("{:04x}: ", i * 16);
+                for byte in chunk {
+                    print!("{:02x} ", byte);
+                }
+                println!();
+            }
+
+            // Try to deserialize as DequeAccount
+            println!("\nAttempting to deserialize...");
+            match DequeAccount::try_from_slice(&account.data) {
+                Ok(deque) => match deque {
+                    DequeAccount::FiveU64s(d) => {
+                        println!("Order(head→tail): {:?}", collect_from_head_u64(&d));
+                    }
+                    DequeAccount::TenU32s(d) => {
+                        println!("Order(head→tail): {:?}", collect_from_head_u32(&d));
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to deserialize: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            println!("Failed to get account: {}", e);
+        }
+    }
+}
+
+fn collect_from_head_u64<const N: usize>(d: &Deque<u64, N>) -> Vec<u64> {
+    let mut out = Vec::new();
+    let mut cur: Link = d.head;
+    while cur != NIL {
+        let u = cur as usize;
+        if d.nodes[u].in_use {
+            out.push(d.nodes[u].data);
+        }
+        cur = d.nodes[u].next;
+    }
+    out
+}
+
+fn collect_from_head_u32<const N: usize>(d: &Deque<u32, N>) -> Vec<u32> {
+    let mut out = Vec::new();
+    let mut cur: Link = d.head;
+    while cur != NIL {
+        let u = cur as usize;
+        if d.nodes[u].in_use {
+            out.push(d.nodes[u].data);
+        }
+        cur = d.nodes[u].next;
+    }
+    out
 }
 
 fn send_instruction(

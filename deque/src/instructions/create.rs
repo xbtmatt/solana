@@ -11,7 +11,10 @@ use solana_program::{
     sysvar::Sysvar,
 };
 
-use crate::state::{Deque, DequeAccount};
+use crate::{
+    log_bytes,
+    state::{Deque, DequeAccount},
+};
 
 pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], deque_type: u8) -> ProgramResult {
     msg!("Initialize deque type: {}", deque_type);
@@ -27,7 +30,11 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], deque_type: u8) ->
         _ => return Err(ProgramError::InvalidInstructionData),
     };
 
-    let account_span = to_vec(&deque)?.len();
+    let serialized = to_vec(&deque)?;
+    msg!("logging serializeed bytes in create");
+    log_bytes(&serialized);
+
+    let account_span = serialized.len();
     let lamports_required = (Rent::get()?).minimum_balance(account_span);
 
     invoke(

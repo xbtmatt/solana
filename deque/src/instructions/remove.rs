@@ -7,9 +7,9 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-use crate::state::DequeAccount;
+use crate::state::{DequeAccount, Link};
 
-pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], index: u64) -> ProgramResult {
+pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], index: Link) -> ProgramResult {
     msg!("Remove at index: {}", index);
 
     let accounts_iter = &mut accounts.iter();

@@ -1,7 +1,5 @@
 #[cfg(test)]
-mod tests {
-    use super::*;
-
+mod layout_tests {
     #[test]
     fn happy_path() {}
 }
