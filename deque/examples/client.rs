@@ -154,9 +154,6 @@ fn test_u64_deque(
         // In a real scenario, you'd deserialize and iterate through the deque
         // For now, just show that the account exists and has data
     }
-
-    println!("\n=== Inspecting initialized Five u64s account ===");
-    inspect_account(client, &deque_account.pubkey());
 }
 
 fn test_u32_deque(
@@ -266,31 +263,29 @@ fn test_u32_deque(
         // Expected order after all operations (conceptually):
         // Front: 70, 50, 30, (removed), 10, (removed), 20, 40, 60, 80, 90 :Back
     }
-
-    println!("\n=== Inspecting initialized Ten u32s account ===");
-    inspect_account(client, &deque_account.pubkey());
 }
-fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey) {
+fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
     match client.get_account(account_pubkey) {
         Ok(account) => {
-            println!("Account owner: {}", account.owner);
-            println!("Account lamports: {}", account.lamports);
-            println!("Account data length: {} bytes", account.data.len());
-            println!("Account executable: {}", account.executable);
+            if verbose {
+                println!("Account owner: {}", account.owner);
+                println!("Account lamports: {}", account.lamports);
+                println!("Account data length: {} bytes", account.data.len());
+                println!("Account executable: {}", account.executable);
 
-            // Display raw bytes (first 100 or so)
-            println!("\nRaw data (hex):");
-            let display_len = std::cmp::min(account.data.len(), 100);
-            for (i, chunk) in account.data[..display_len].chunks(16).enumerate() {
-                print!("{:04x}: ", i * 16);
-                for byte in chunk {
-                    print!("{:02x} ", byte);
+                // Display raw bytes (first 100 or so)
+                println!("\nRaw data (hex):");
+                let display_len = std::cmp::min(account.data.len(), 100);
+                for (i, chunk) in account.data[..display_len].chunks(16).enumerate() {
+                    print!("{:04x}: ", i * 16);
+                    for byte in chunk {
+                        print!("{:02x} ", byte);
+                    }
+                    println!();
                 }
-                println!();
             }
 
-            // Try to deserialize as DequeAccount
-            println!("\nAttempting to deserialize...");
+            // Try to deserialize as DequeAccount.
             match DequeAccount::try_from_slice(&account.data) {
                 Ok(deque) => match deque {
                     DequeAccount::FiveU64s(d) => {
@@ -363,4 +358,6 @@ fn send_instruction(
         Ok(_sig) => println!("  ✓ {} successful", operation),
         Err(e) => eprintln!("  ✗ {} failed: {}", operation, e),
     }
+
+    inspect_account(client, &deque_account, false);
 }
