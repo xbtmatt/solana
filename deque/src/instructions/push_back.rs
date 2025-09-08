@@ -16,6 +16,7 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], value: Vec<u8>) -
     let deque_account = next_account_info(accounts_iter)?;
 
     let mut data = deque_account.data.borrow_mut();
+    let mut deque = DequeAccount::try_from_slice(&data)?;
 
     if deque_account.owner.as_array() != PROGRAM_ID_PUBKEY.as_array() {
         msg!("account not owned by program");
@@ -24,15 +25,6 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], value: Vec<u8>) -
     if !deque_account.is_writable {
         msg!("account not writable");
         return Err(ProgramError::InvalidAccountData);
-    }
-
-    let mut deque = DequeAccount::try_from_slice(&data)?;
-
-    msg!("jafdhaskfaskdfhj");
-    msg!(&String::from_utf8_lossy(&data.to_vec()));
-
-    if 100 * 2 == 3 {
-        return Err(ProgramError::IncorrectProgramId);
     }
 
     match &mut deque {

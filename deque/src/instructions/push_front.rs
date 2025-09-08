@@ -7,7 +7,7 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-use crate::state::DequeAccount;
+use crate::{state::DequeAccount, PROGRAM_ID_PUBKEY};
 
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], value: Vec<u8>) -> ProgramResult {
     msg!("Push front.");
@@ -17,6 +17,15 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], value: Vec<u8>) -
 
     let mut data = deque_account.data.borrow_mut();
     let mut deque = DequeAccount::try_from_slice(&data)?;
+
+    if deque_account.owner.as_array() != PROGRAM_ID_PUBKEY.as_array() {
+        msg!("account not owned by program");
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    if !deque_account.is_writable {
+        msg!("account not writable");
+        return Err(ProgramError::InvalidAccountData);
+    }
 
     match &mut deque {
         DequeAccount::FiveU64s(d) => {
