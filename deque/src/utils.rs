@@ -1,7 +1,8 @@
 use solana_program::{msg, program_error::ProgramError};
 
-pub type Index = u32;
-pub const NIL: Index = Index::MAX;
+pub type SlotIndex = u32;
+pub const NIL: SlotIndex = SlotIndex::MAX;
+pub const SECTOR_SIZE: usize = 100;
 
 /// Below is taken directly from:
 /// https://github.com/solana-program/libraries/blob/main/pod/src/primitives.rs
@@ -24,17 +25,17 @@ impl From<bool> for PodBool {
 
 /// Marker trait to narrow an account data's Pod-based outer Node<T> type (used as a slice of
 /// mutable bytes: &mut [u8]) so that T can't also be passed.
-pub trait SlabElement: bytemuck::Pod {}
+pub trait Slab: bytemuck::Pod {}
 
-pub fn from_slab_bytes<T: SlabElement>(data: &[u8], index: Index) -> Result<&T, ProgramError> {
+pub fn from_slab_bytes<T: Slab>(data: &[u8], index: SlotIndex) -> Result<&T, ProgramError> {
     let i = index as usize;
     bytemuck::try_from_bytes(&data[i..i + std::mem::size_of::<T>()])
         .map_err(|_| ProgramError::InvalidAccountData)
 }
 
-pub fn from_slab_bytes_mut<T: SlabElement>(
+pub fn from_slab_bytes_mut<T: Slab>(
     data: &mut [u8],
-    index: Index,
+    index: SlotIndex,
 ) -> Result<&mut T, ProgramError> {
     let i = index as usize;
     bytemuck::try_from_bytes_mut(&mut data[i..i + std::mem::size_of::<T>()])

@@ -1,4 +1,5 @@
 #![allow(unexpected_cfgs)]
+#![feature(generic_const_exprs)]
 
 use solana_program::{declare_id, entrypoint, pubkey::Pubkey};
 
