@@ -4,8 +4,8 @@ use crate::PROGRAM_ID_PUBKEY;
 
 /// The ordinal `slot` index in the slab of bytes dedicated to inner data for a type.
 /// That is, to get the raw bytes offset, it is multiplied by the slot type's slot size.
-pub type SlotIndex = u32;
-pub const NIL: SlotIndex = SlotIndex::MAX;
+pub type SectorIndex = u32;
+pub const NIL: SectorIndex = SectorIndex::MAX;
 
 /// Below is taken directly from:
 /// https://github.com/solana-program/libraries/blob/main/pod/src/primitives.rs
@@ -48,27 +48,30 @@ pub fn from_slab_bytes_mut<T: Slab>(
 }
 
 #[inline(always)]
-pub fn from_slot<T: Slab>(slots: &[u8], slot: SlotIndex) -> Result<&T, ProgramError> {
-    if slot == NIL {
+pub fn from_sector_idx<T: Slab>(sectors: &[u8], idx: SectorIndex) -> Result<&T, ProgramError> {
+    if idx == NIL {
         return Err(ProgramError::InvalidAccountData);
     }
     let stride = size_of::<T>();
-    let start = (slot as usize)
+    let start = (idx as usize)
         .checked_mul(stride)
         .ok_or(ProgramError::InvalidAccountData)?;
-    from_slab_bytes(slots, start)
+    from_slab_bytes(sectors, start)
 }
 
 #[inline(always)]
-pub fn from_slot_mut<T: Slab>(slots: &mut [u8], slot: SlotIndex) -> Result<&mut T, ProgramError> {
-    if slot == NIL {
+pub fn from_sector_idx_mut<T: Slab>(
+    sectors: &mut [u8],
+    idx: SectorIndex,
+) -> Result<&mut T, ProgramError> {
+    if idx == NIL {
         return Err(ProgramError::InvalidAccountData);
     }
     let stride = size_of::<T>();
-    let start = (slot as usize)
+    let start = (idx as usize)
         .checked_mul(stride)
         .ok_or(ProgramError::InvalidAccountData)?;
-    from_slab_bytes_mut(slots, start)
+    from_slab_bytes_mut(sectors, start)
 }
 
 pub fn log_bytes(bytes: &[u8]) {

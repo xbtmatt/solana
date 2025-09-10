@@ -12,13 +12,13 @@ use solana_program::{
 
 use crate::{
     state::{Deque, DequeType, Stack, HEADER_FIXED_SIZE},
-    utils::{check_owned_and_writable, SlotIndex},
+    utils::{check_owned_and_writable, SectorIndex},
 };
 
-pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_slots: u16) -> ProgramResult {
-    msg!("Adding {} slots.", num_slots);
+pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) -> ProgramResult {
+    msg!("Adding {} sectors.", num_sectors);
 
-    if num_slots < 1 {
+    if num_sectors < 1 {
         return Err(ProgramError::InvalidArgument);
     }
 
@@ -39,7 +39,7 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_slots: u16) -
 
     drop(deque_data);
 
-    let additional_space = slot_size * (num_slots as usize);
+    let additional_space = slot_size * (num_sectors as usize);
     let new_account_space = current_size + additional_space;
 
     let new_lamports_required = Rent::get()?.minimum_balance(new_account_space);
@@ -65,25 +65,27 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_slots: u16) -
     // > Pass true for zero_init in this case, otherwise compute units will be wasted re-zero-initializing.
     deque_account.realloc(new_account_space, false)?;
 
-    // Now chain the old slots to the new slots in the stack of free nodes.
+    // Now chain the old sectors to the new sectors in the stack of free nodes.
     let mut deque_data = deque_account.data.borrow_mut();
     let deque = Deque::new_from_bytes(&mut deque_data)?;
 
-    let curr_n_slots = (current_size - HEADER_FIXED_SIZE) / slot_size;
-    let new_n_slots = curr_n_slots + num_slots as usize;
+    let curr_n_sectors = (current_size - HEADER_FIXED_SIZE) / slot_size;
+    let new_n_sectors = curr_n_sectors + num_sectors as usize;
 
+    // NOTE: This currently is O(n) writes for n new sectors. Technically, this could be O(1) by
+    // overlaying the slab directly
     match deque_type {
         DequeType::U32 => {
-            let mut free = Stack::<u32>::new(deque.slots, deque.header.free_head);
-            for i in curr_n_slots..new_n_slots {
-                free.push_to_free(i as SlotIndex)?;
+            let mut free = Stack::<u32>::new(deque.sectors, deque.header.free_head);
+            for i in curr_n_sectors..new_n_sectors {
+                free.push_to_free(i as SectorIndex)?;
             }
             deque.header.free_head = free.get_head();
         }
         DequeType::U64 => {
-            let mut free = Stack::<u64>::new(deque.slots, deque.header.free_head);
-            for i in curr_n_slots..new_n_slots {
-                free.push_to_free(i as SlotIndex)?;
+            let mut free = Stack::<u64>::new(deque.sectors, deque.header.free_head);
+            for i in curr_n_sectors..new_n_sectors {
+                free.push_to_free(i as SectorIndex)?;
             }
             deque.header.free_head = free.get_head();
         }

@@ -8,10 +8,10 @@ use solana_program::{
 
 use crate::{
     state::{Deque, DequeType},
-    utils::{check_owned_and_writable, SlotIndex},
+    utils::{check_owned_and_writable, SectorIndex},
 };
 
-pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], index: SlotIndex) -> ProgramResult {
+pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], index: SectorIndex) -> ProgramResult {
     msg!("Remove at index: {}", index);
 
     let accounts_iter = &mut accounts.iter();

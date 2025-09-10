@@ -1,6 +1,6 @@
 use deque::{
     state::{Deque, DequeInstruction, DequeNode, DequeType, HEADER_FIXED_SIZE},
-    utils::from_slot,
+    utils::from_sector_idx,
     PROGRAM_ID_PUBKEY,
 };
 use solana_client::rpc_client::RpcClient;
@@ -65,7 +65,7 @@ fn test_u64_deque(
     println!("Initializing Deque<u64>...");
     let init_data = borsh::to_vec(&DequeInstruction::Initialize {
         deque_type: DequeType::U64.into(),
-        num_slots: 5,
+        num_sectors: 5,
     })
     .expect("Failed to serialize");
 
@@ -151,13 +151,13 @@ fn test_u64_deque(
         "push_back",
     );
 
-    print_size_and_slots(client, deque_account);
+    print_size_and_sectors(client, deque_account);
 
     // ----------------------------------------- Resize --------------------------------------------
     println!("Resizing Deque<u64>...");
-    let additional_slots = 7;
+    let additional_sectors = 7;
     let resize_data: Vec<u8> = borsh::to_vec(&DequeInstruction::Resize {
-        num_slots: additional_slots,
+        num_sectors: additional_sectors,
     })
     .expect("Failed to serialize.");
 
@@ -187,7 +187,7 @@ fn test_u64_deque(
 
     // ---------------------------------------- Push more ------------------------------------------
     let start = 71u64;
-    let end = start + additional_slots as u64;
+    let end = start + additional_sectors as u64;
     for i in start..=end {
         send_instruction(
             client,
@@ -201,7 +201,7 @@ fn test_u64_deque(
         );
     }
 
-    print_size_and_slots(client, deque_account);
+    print_size_and_sectors(client, deque_account);
 }
 
 fn test_u32_deque(
@@ -214,7 +214,7 @@ fn test_u32_deque(
     println!("Initializing Deque<u32>...");
     let init_data = borsh::to_vec(&DequeInstruction::Initialize {
         deque_type: DequeType::U32.into(),
-        num_slots: 10,
+        num_sectors: 10,
     })
     .expect("Failed to serialize");
 
@@ -308,13 +308,13 @@ fn test_u32_deque(
         );
     }
 
-    print_size_and_slots(client, deque_account);
+    print_size_and_sectors(client, deque_account);
 
     // ----------------------------------------- Resize --------------------------------------------
     println!("Resizing Deque<u32>...");
-    let additional_slots = 3;
+    let additional_sectors = 3;
     let resize_data: Vec<u8> = borsh::to_vec(&DequeInstruction::Resize {
-        num_slots: additional_slots,
+        num_sectors: additional_sectors,
     })
     .expect("Failed to serialize.");
 
@@ -342,11 +342,11 @@ fn test_u32_deque(
         }
     }
 
-    print_size_and_slots(client, deque_account);
+    print_size_and_sectors(client, deque_account);
 
     // ---------------------------------------- Push more ------------------------------------------
     let start = 31u32;
-    let end = start + additional_slots as u32;
+    let end = start + additional_sectors as u32;
     for i in start..=end {
         send_instruction(
             client,
@@ -363,7 +363,7 @@ fn test_u32_deque(
     // --------------------------------------- Print size ------------------------------------------
 }
 
-fn print_size_and_slots(client: &RpcClient, account: &Keypair) {
+fn print_size_and_sectors(client: &RpcClient, account: &Keypair) {
     if let Ok(account) = client.get_account(&account.pubkey()) {
         let cloned_data = &mut account.data.clone();
         let deque =
@@ -371,7 +371,7 @@ fn print_size_and_slots(client: &RpcClient, account: &Keypair) {
         let slot_size = deque.header.get_type().slot_size();
         let len = account.data.len();
         println!(
-            "\nAccount size: {} bytes, {} slots\n",
+            "\nAccount size: {} bytes, {} sectors\n",
             len,
             (len - HEADER_FIXED_SIZE) / slot_size
         );
@@ -418,10 +418,11 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                     let from_head = deque
                         .iter_indices_from_head::<u32>()
                         .map(|it| {
-                            *from_slot::<DequeNode<u32>>(deque.slots, it).expect("Should be valid.")
+                            *from_sector_idx::<DequeNode<u32>>(deque.sectors, it)
+                                .expect("Should be valid.")
                         })
                         .collect::<Vec<DequeNode<u32>>>();
-                    // let free_head = from_slot::<DequeNode<u32>>(slots, header.free_head);
+                    // let free_head = from_slot::<DequeNode<u32>>(sectors, header.free_head);
                     println!(
                         "{:?}",
                         from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
@@ -431,10 +432,11 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                     let from_head = deque
                         .iter_indices_from_head::<u64>()
                         .map(|it| {
-                            *from_slot::<DequeNode<u64>>(deque.slots, it).expect("Should be valid.")
+                            *from_sector_idx::<DequeNode<u64>>(deque.sectors, it)
+                                .expect("Should be valid.")
                         })
                         .collect::<Vec<DequeNode<u64>>>();
-                    // let free_head = from_slot::<DequeNode<u64>>(slots, header.free_head);
+                    // let free_head = from_slot::<DequeNode<u64>>(sectors, header.free_head);
                     println!(
                         "{:?}",
                         from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
@@ -443,7 +445,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
             }
 
             // println!("{:#?}", header);
-            // println!("{:#?}", slots);
+            // println!("{:#?}", sectors);
 
             // Try to deserialize as DequeAccount.
             // match Deque::as_deque_mut(&account.data) {

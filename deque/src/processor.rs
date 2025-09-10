@@ -14,8 +14,8 @@ pub fn process_instruction(
     match instruction {
         DequeInstruction::Initialize {
             deque_type,
-            num_slots,
-        } => instructions::create::process(program_id, accounts, deque_type, num_slots),
+            num_sectors,
+        } => instructions::create::process(program_id, accounts, deque_type, num_sectors),
         DequeInstruction::PushFront { value } => {
             instructions::push_front::process(program_id, accounts, value)
         }
@@ -25,8 +25,8 @@ pub fn process_instruction(
         DequeInstruction::Remove { index } => {
             instructions::remove::process(program_id, accounts, index)
         }
-        DequeInstruction::Resize { num_slots } => {
-            instructions::resize::process(program_id, accounts, num_slots)
+        DequeInstruction::Resize { num_sectors } => {
+            instructions::resize::process(program_id, accounts, num_sectors)
         }
     }
 }

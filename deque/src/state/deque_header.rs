@@ -1,6 +1,6 @@
 use crate::{
     state::{DequeNode, StackNode},
-    utils::{Slab, SlotIndex, NIL},
+    utils::{SectorIndex, Slab, NIL},
 };
 use bytemuck::{Pod, Zeroable};
 use solana_program::program_error::ProgramError;
@@ -62,10 +62,10 @@ pub struct DequeHeader {
     pub version: u8,
     pub deque_type: u8,
     pub _padding: [u8; 2],
-    pub len: SlotIndex,
-    pub free_head: SlotIndex,
-    pub deque_head: SlotIndex,
-    pub deque_tail: SlotIndex,
+    pub len: SectorIndex,
+    pub free_head: SectorIndex,
+    pub deque_head: SectorIndex,
+    pub deque_tail: SectorIndex,
     pub _padding2: [u8; 4],
 }
 

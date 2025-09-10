@@ -15,13 +15,13 @@ pub fn process(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     deque_ty: u8,
-    num_slots: u16,
+    num_sectors: u16,
 ) -> ProgramResult {
     let deque_type = DequeType::try_from(deque_ty)?;
     msg!(
         "Initialize deque type: {:#?} with {:?} slot(s)",
         deque_type,
-        num_slots
+        num_sectors
     );
 
     let accounts_iter = &mut accounts.iter();
@@ -30,7 +30,7 @@ pub fn process(
     let system_program = next_account_info(accounts_iter)?;
 
     let slot_size = deque_type.slot_size();
-    let account_space = HEADER_FIXED_SIZE + slot_size * (num_slots as usize);
+    let account_space = HEADER_FIXED_SIZE + slot_size * (num_sectors as usize);
     let lamports_required = Rent::get()?.minimum_balance(account_space);
 
     invoke(
@@ -46,7 +46,7 @@ pub fn process(
 
     {
         let mut data = deque_account.try_borrow_mut_data()?;
-        Deque::init_deque_account(&mut data, deque_type, num_slots)?;
+        Deque::init_deque_account(&mut data, deque_type, num_sectors)?;
     }
 
     msg!(
