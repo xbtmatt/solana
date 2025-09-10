@@ -19,7 +19,7 @@ pub fn process(
 ) -> ProgramResult {
     let deque_type = DequeType::try_from(deque_ty)?;
     msg!(
-        "Initialize deque type: {:#?} with {:?} slot(s)",
+        "Initialize deque type: {:#?} with {:?} sector(s)",
         deque_type,
         num_sectors
     );
@@ -29,8 +29,8 @@ pub fn process(
     let payer = next_account_info(accounts_iter)?;
     let system_program = next_account_info(accounts_iter)?;
 
-    let slot_size = deque_type.slot_size();
-    let account_space = HEADER_FIXED_SIZE + slot_size * (num_sectors as usize);
+    let sector_size = deque_type.sector_size();
+    let account_space = HEADER_FIXED_SIZE + sector_size * (num_sectors as usize);
     let lamports_required = Rent::get()?.minimum_balance(account_space);
 
     invoke(

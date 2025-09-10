@@ -2,8 +2,8 @@ use solana_program::{account_info::AccountInfo, msg, program_error::ProgramError
 
 use crate::PROGRAM_ID_PUBKEY;
 
-/// The ordinal `slot` index in the slab of bytes dedicated to inner data for a type.
-/// That is, to get the raw bytes offset, it is multiplied by the slot type's slot size.
+/// The ordinal `sector` index in the slab of bytes dedicated to inner data for a type.
+/// That is, to get the raw bytes offset, it is multiplied by the sector type's sector size.
 pub type SectorIndex = u32;
 pub const NIL: SectorIndex = SectorIndex::MAX;
 

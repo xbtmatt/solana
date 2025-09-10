@@ -16,11 +16,10 @@ use crate::{
 };
 
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) -> ProgramResult {
-    msg!("Adding {} sectors.", num_sectors);
-
     if num_sectors < 1 {
         return Err(ProgramError::InvalidArgument);
     }
+    msg!("Adding {} sectors.", num_sectors);
 
     let accounts_iter = &mut accounts.iter();
     let deque_account = next_account_info(accounts_iter)?;
@@ -35,11 +34,11 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
 
     let deque = Deque::new_from_bytes(&mut deque_data)?;
     let deque_type = deque.header.get_type();
-    let slot_size = deque_type.slot_size();
+    let sector_size = deque_type.sector_size();
 
     drop(deque_data);
 
-    let additional_space = slot_size * (num_sectors as usize);
+    let additional_space = sector_size * (num_sectors as usize);
     let new_account_space = current_size + additional_space;
 
     let new_lamports_required = Rent::get()?.minimum_balance(new_account_space);
@@ -69,7 +68,7 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
     let mut deque_data = deque_account.data.borrow_mut();
     let deque = Deque::new_from_bytes(&mut deque_data)?;
 
-    let curr_n_sectors = (current_size - HEADER_FIXED_SIZE) / slot_size;
+    let curr_n_sectors = (current_size - HEADER_FIXED_SIZE) / sector_size;
     let new_n_sectors = curr_n_sectors + num_sectors as usize;
 
     // NOTE: This currently is O(n) writes for n new sectors. Technically, this could be O(1) by

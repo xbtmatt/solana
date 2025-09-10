@@ -47,7 +47,7 @@ impl DequeType {
     }
 
     #[inline(always)]
-    pub fn slot_size(self) -> usize {
+    pub fn sector_size(self) -> usize {
         match self {
             DequeType::U32 => size_of::<DequeNode<u32>>(),
             DequeType::U64 => size_of::<DequeNode<u64>>(),

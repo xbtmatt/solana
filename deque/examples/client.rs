@@ -368,12 +368,12 @@ fn print_size_and_sectors(client: &RpcClient, account: &Keypair) {
         let cloned_data = &mut account.data.clone();
         let deque =
             Deque::new_from_bytes(cloned_data).expect("Should be able to deserialize into Deque.");
-        let slot_size = deque.header.get_type().slot_size();
+        let sector_size = deque.header.get_type().sector_size();
         let len = account.data.len();
         println!(
             "\nAccount size: {} bytes, {} sectors\n",
             len,
-            (len - HEADER_FIXED_SIZE) / slot_size
+            (len - HEADER_FIXED_SIZE) / sector_size
         );
     }
 }
@@ -422,7 +422,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                                 .expect("Should be valid.")
                         })
                         .collect::<Vec<DequeNode<u32>>>();
-                    // let free_head = from_slot::<DequeNode<u32>>(sectors, header.free_head);
+                    // let free_head = from_sector::<DequeNode<u32>>(sectors, header.free_head);
                     println!(
                         "{:?}",
                         from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
@@ -436,7 +436,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                                 .expect("Should be valid.")
                         })
                         .collect::<Vec<DequeNode<u64>>>();
-                    // let free_head = from_slot::<DequeNode<u64>>(sectors, header.free_head);
+                    // let free_head = from_sector::<DequeNode<u64>>(sectors, header.free_head);
                     println!(
                         "{:?}",
                         from_head.iter().map(|f| f.inner).collect::<Vec<_>>()

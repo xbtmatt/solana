@@ -44,12 +44,12 @@ impl<'a> Deque<'a> {
         // Write a new empty header to the `deque.header`
         *deque.header = DequeHeader::new_empty(deque_type);
 
-        let slot_size = deque_type.slot_size();
-        debug_assert_eq!(deque.sectors.len() % slot_size, 0);
-        debug_assert_eq!(deque.sectors.len(), (num_sectors as usize) * slot_size);
+        let sector_size = deque_type.sector_size();
+        debug_assert_eq!(deque.sectors.len() % sector_size, 0);
+        debug_assert_eq!(deque.sectors.len(), (num_sectors as usize) * sector_size);
 
         let space_needed = (num_sectors as usize)
-            .checked_mul(slot_size)
+            .checked_mul(sector_size)
             .ok_or(ProgramError::InvalidAccountData)?;
         if deque.sectors.len() < space_needed {
             return Err(ProgramError::InvalidAccountData);
@@ -163,7 +163,7 @@ impl<'a> Deque<'a> {
             return Err(ProgramError::InvalidArgument);
         }
 
-        // Pick the closer direction, grab the slot index
+        // Pick the closer direction, grab the sector index
         let idx = if pos <= len / 2 {
             self.iter_indices_from_head::<P>().nth(pos as usize)
         } else {
@@ -172,10 +172,10 @@ impl<'a> Deque<'a> {
         }
         .ok_or(ProgramError::InvalidAccountData)?;
 
-        self.remove_at_slot::<P>(idx)
+        self.remove_at_sector::<P>(idx)
     }
 
-    pub fn remove_at_slot<P: Pod + Zeroable + std::fmt::Debug>(
+    pub fn remove_at_sector<P: Pod + Zeroable + std::fmt::Debug>(
         &mut self,
         pos: SectorIndex,
     ) -> Result<P, ProgramError> {
