@@ -38,6 +38,9 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], value: Vec<u8>) -
                 .map_err(|_| ProgramError::InvalidArgument)?;
             msg!("Pushed u64 {} to back at index {}", val, idx);
         }
+        DequeType::Market => {
+            todo!();
+        }
     }
     Ok(())
 }

@@ -442,14 +442,10 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                         from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
                     );
                 }
+                DequeType::Market => {
+                    todo!();
+                }
             }
-
-            // println!("{:#?}", header);
-            // println!("{:#?}", sectors);
-
-            // Try to deserialize as DequeAccount.
-            // match Deque::as_deque_mut(&account.data) {
-            // }
         }
         Err(e) => {
             println!("Failed to get account: {}", e);

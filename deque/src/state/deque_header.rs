@@ -1,23 +1,21 @@
 use crate::{
-    state::{DequeNode, StackNode},
+    state::{DequeNode, MarketEscrow},
     utils::{SectorIndex, Slab, NIL},
 };
 use bytemuck::{Pod, Zeroable};
-use solana_program::program_error::ProgramError;
+use solana_program::{program_error::ProgramError, pubkey::Pubkey};
 use static_assertions::const_assert_eq;
 
 pub const DEQUE_ACCOUNT_DISCRIMINANT: u64 = 0xf00dbabe;
-pub const HEADER_FIXED_SIZE: usize = 32;
+pub const HEADER_FIXED_SIZE: usize = 96;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Zeroable)]
 pub enum DequeType {
     U32,
     U64,
+    Market,
 }
-
-const_assert_eq!(size_of::<DequeNode<u32>>(), size_of::<StackNode<u32>>());
-const_assert_eq!(size_of::<DequeNode<u64>>(), size_of::<StackNode<u64>>());
 
 impl TryFrom<u8> for DequeType {
     type Error = ProgramError;
@@ -26,6 +24,7 @@ impl TryFrom<u8> for DequeType {
         match value {
             0 => Ok(Self::U32),
             1 => Ok(Self::U64),
+            2 => Ok(Self::Market),
             _ => Err(ProgramError::InvalidAccountData),
         }
     }
@@ -39,18 +38,11 @@ impl From<DequeType> for u8 {
 
 impl DequeType {
     #[inline(always)]
-    pub fn elem_size(self) -> usize {
-        match self {
-            DequeType::U32 => 4,
-            DequeType::U64 => 8,
-        }
-    }
-
-    #[inline(always)]
     pub fn sector_size(self) -> usize {
         match self {
             DequeType::U32 => size_of::<DequeNode<u32>>(),
             DequeType::U64 => size_of::<DequeNode<u64>>(),
+            DequeType::Market => size_of::<DequeNode<MarketEscrow>>(),
         }
     }
 }
@@ -67,6 +59,8 @@ pub struct DequeHeader {
     pub deque_head: SectorIndex,
     pub deque_tail: SectorIndex,
     pub _padding2: [u8; 4],
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
 }
 
 unsafe impl Pod for DequeHeader {}
@@ -85,9 +79,12 @@ impl DequeHeader {
             deque_head: NIL,
             deque_tail: NIL,
             _padding2: [0; 4],
+            base_mint: todo!(),
+            quote_mint: todo!(),
         }
     }
 
+    #[inline]
     pub fn get_type(&self) -> DequeType {
         self.deque_type
             .try_into()
@@ -115,6 +112,8 @@ const_assert_eq!(
     4 + // free_head
     4 + // deque_head
     4 + // deque_tail
-    4 // padding2
+    4 + // padding2
+    32 + // base_mint
+    32 // quote_mint
 );
 const_assert_eq!(size_of::<DequeHeader>() % 8, 0);

@@ -9,4 +9,6 @@ pub enum DequeInstruction {
     PushBack { value: Vec<u8> },
     Remove { index: SectorIndex },
     Resize { num_sectors: u16 },
+    Deposit { amount: u64 },
+    Withdraw { amount: u64 },
 }

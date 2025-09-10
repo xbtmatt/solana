@@ -3,7 +3,7 @@ use solana_program::program_error::ProgramError;
 
 use crate::{
     state::DequeNode,
-    utils::{from_sector_idx_mut, Slab, SectorIndex, NIL},
+    utils::{from_sector_idx_mut, SectorIndex, Slab, NIL},
 };
 
 /// NIL/LAST are interchangeable within the context of the stack structure.

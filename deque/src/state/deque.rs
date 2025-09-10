@@ -1,8 +1,9 @@
 use bytemuck::{Pod, Zeroable};
 use solana_program::{msg, program_error::ProgramError};
+use static_assertions::const_assert_eq;
 
 use crate::{
-    state::{DequeHeader, DequeType, Stack, StackNode, HEADER_FIXED_SIZE},
+    state::{DequeHeader, DequeType, MarketEscrow, Stack, StackNode, HEADER_FIXED_SIZE},
     utils::{from_sector_idx, from_sector_idx_mut, from_slab_bytes_mut, SectorIndex, Slab, NIL},
 };
 
@@ -14,6 +15,15 @@ pub struct DequeNode<T> {
     pub prev: SectorIndex,
     pub next: SectorIndex,
 }
+
+// Ensure that deque and stack nodes are the same size, regardless of type.
+const_assert_eq!(size_of::<DequeNode<u8>>(), size_of::<StackNode<u8>>());
+const_assert_eq!(size_of::<DequeNode<u32>>(), size_of::<StackNode<u32>>());
+const_assert_eq!(size_of::<DequeNode<u64>>(), size_of::<StackNode<u64>>());
+const_assert_eq!(
+    size_of::<DequeNode<[u8; 7]>>(),
+    size_of::<StackNode<[u8; 7]>>()
+);
 
 unsafe impl<T: Pod> Pod for DequeNode<T> {}
 
@@ -56,6 +66,7 @@ impl<'a> Deque<'a> {
         match deque_type {
             DequeType::U32 => deque.init_free_stack::<u32>(num_sectors as usize)?,
             DequeType::U64 => deque.init_free_stack::<u64>(num_sectors as usize)?,
+            DequeType::Market => deque.init_free_stack::<MarketEscrow>(num_sectors as usize)?,
         }
 
         Ok(())

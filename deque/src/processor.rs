@@ -28,5 +28,11 @@ pub fn process_instruction(
         DequeInstruction::Resize { num_sectors } => {
             instructions::resize::process(program_id, accounts, num_sectors)
         }
+        DequeInstruction::Deposit { amount } => {
+            instructions::deposit::process(program_id, accounts, amount)
+        }
+        DequeInstruction::Withdraw { amount } => {
+            instructions::withdraw::process(program_id, accounts, amount)
+        }
     }
 }

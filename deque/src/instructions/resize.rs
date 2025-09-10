@@ -88,6 +88,9 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
             }
             deque.header.free_head = free.get_head();
         }
+        DequeType::Market => {
+            todo!();
+        }
     }
 
     Ok(())

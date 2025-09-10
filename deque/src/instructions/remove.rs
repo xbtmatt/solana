@@ -11,7 +11,11 @@ use crate::{
     utils::{check_owned_and_writable, SectorIndex},
 };
 
-pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], index: SectorIndex) -> ProgramResult {
+pub fn process(
+    _program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    index: SectorIndex,
+) -> ProgramResult {
     msg!("Remove at index: {}", index);
 
     let accounts_iter = &mut accounts.iter();
@@ -34,6 +38,9 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], index: SectorInde
                 .remove::<u64>(index)
                 .map_err(|_| ProgramError::InvalidArgument)?;
             msg!("Removed U64 value: {}", removed);
+        }
+        DequeType::Market => {
+            todo!();
         }
     }
     Ok(())
