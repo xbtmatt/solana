@@ -1,4 +1,4 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshDeserialize;
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
@@ -7,7 +7,10 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-use crate::{state::DequeAccount, PROGRAM_ID_PUBKEY};
+use crate::{
+    state::{Deque, DequeType},
+    utils::check_owned_and_writable,
+};
 
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], value: Vec<u8>) -> ProgramResult {
     msg!("Push back.");
@@ -16,30 +19,25 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], value: Vec<u8>) -
     let deque_account = next_account_info(accounts_iter)?;
 
     let mut data = deque_account.data.borrow_mut();
-    let mut deque = DequeAccount::try_from_slice(&data)?;
+    let mut deque = Deque::new_from_bytes(&mut data)?;
 
-    if deque_account.owner.as_array() != PROGRAM_ID_PUBKEY.as_array() {
-        msg!("account not owned by program");
-        return Err(ProgramError::IncorrectProgramId);
-    }
-    if !deque_account.is_writable {
-        msg!("account not writable");
-        return Err(ProgramError::InvalidAccountData);
-    }
+    check_owned_and_writable(deque_account)?;
 
-    match &mut deque {
-        DequeAccount::FiveU64s(d) => {
-            let val = u64::deserialize(&mut &value[..])?;
-            let idx = d.push_back(val).map_err(|_| ProgramError::Custom(1))?;
+    match deque.header.get_type() {
+        DequeType::U32 => {
+            let val = u32::deserialize(&mut &value[..])?;
+            let idx = deque
+                .push_back(val)
+                .map_err(|_| ProgramError::InvalidArgument)?;
             msg!("Pushed u64 {} to back at index {}", val, idx);
         }
-        DequeAccount::TenU32s(d) => {
-            let val = u32::deserialize(&mut &value[..])?;
-            let idx = d.push_back(val).map_err(|_| ProgramError::Custom(1))?;
-            msg!("Pushed u32 {} to back at index {}", val, idx);
+        DequeType::U64 => {
+            let val = u64::deserialize(&mut &value[..])?;
+            let idx = deque
+                .push_back(val)
+                .map_err(|_| ProgramError::InvalidArgument)?;
+            msg!("Pushed u64 {} to back at index {}", val, idx);
         }
     }
-
-    deque.serialize(&mut &mut data[..])?;
     Ok(())
 }

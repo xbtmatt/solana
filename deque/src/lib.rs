@@ -1,5 +1,4 @@
 #![allow(unexpected_cfgs)]
-#![feature(generic_const_exprs)]
 
 use solana_program::{declare_id, entrypoint, pubkey::Pubkey};
 
@@ -11,7 +10,7 @@ pub mod state;
 pub mod tests;
 pub mod utils;
 
-pub const PROGRAM_ID_STR: &str = "2XMZLhL2aL95mjmEC3t8ocKKiku7MLM7CnqUBvci44F4";
+pub const PROGRAM_ID_STR: &str = "9SM4HUDDWsKDs9wCkfdGwkfDtUL9WwXUnmqdwNnZTzBW";
 pub const PROGRAM_ID_PUBKEY: Pubkey = Pubkey::from_str_const(PROGRAM_ID_STR);
 
 declare_id!(PROGRAM_ID_STR);

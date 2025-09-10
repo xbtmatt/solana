@@ -1,8 +1,8 @@
 use borsh::BorshDeserialize;
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
 
-use crate::state::DequeInstruction;
 use crate::instructions;
+use crate::state::DequeInstruction;
 
 pub fn process_instruction(
     program_id: &Pubkey,
@@ -12,9 +12,10 @@ pub fn process_instruction(
     let instruction = DequeInstruction::try_from_slice(instruction_data)?;
 
     match instruction {
-        DequeInstruction::Initialize { deque_type } => {
-            instructions::create::process(program_id, accounts, deque_type)
-        }
+        DequeInstruction::Initialize {
+            deque_type,
+            num_slots,
+        } => instructions::create::process(program_id, accounts, deque_type, num_slots),
         DequeInstruction::PushFront { value } => {
             instructions::push_front::process(program_id, accounts, value)
         }

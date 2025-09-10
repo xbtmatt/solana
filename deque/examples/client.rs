@@ -1,6 +1,6 @@
-use borsh::{BorshDeserialize, BorshSerialize};
 use deque::{
-    state::{Deque, DequeAccount, DequeInstruction, Link, NIL},
+    state::{Deque, DequeInstruction, DequeNode, DequeType},
+    utils::from_slot,
     PROGRAM_ID_PUBKEY,
 };
 use solana_client::rpc_client::RpcClient;
@@ -12,7 +12,6 @@ use solana_sdk::{
     system_program,
     transaction::Transaction,
 };
-use std::str::FromStr;
 
 #[tokio::main]
 async fn main() {
@@ -48,10 +47,12 @@ async fn main() {
     let deque_u64 = Keypair::new();
     println!("{:#?}", deque_u64.pubkey().to_string());
     test_u64_deque(&client, &payer, &deque_u64, program_id);
+    inspect_account(&client, &deque_u64.pubkey(), false);
 
     println!("\n=== Testing Deque<u32, 10> ===");
     let deque_u32 = Keypair::new();
     test_u32_deque(&client, &payer, &deque_u32, program_id);
+    inspect_account(&client, &deque_u32.pubkey(), false);
 }
 
 fn test_u64_deque(
@@ -60,10 +61,12 @@ fn test_u64_deque(
     deque_account: &Keypair,
     program_id: Pubkey,
 ) {
-    // Initialize deque for u64s (type 0)
     println!("Initializing Deque<u64, 5>...");
-    let init_data = borsh::to_vec(&DequeInstruction::Initialize { deque_type: 0 })
-        .expect("Failed to serialize");
+    let init_data = borsh::to_vec(&DequeInstruction::Initialize {
+        deque_type: DequeType::U64.into(),
+        num_slots: 5,
+    })
+    .expect("Failed to serialize");
 
     let init_instruction = Instruction::new_with_bytes(
         program_id,
@@ -89,9 +92,8 @@ fn test_u64_deque(
         }
     }
 
-    // Push some values to the front
-    println!("\nPushing values to front: 100, 200");
-    for value in [100u64, 200u64] {
+    for value in [7u64, 8u64] {
+        println!("\nPushing {} to front.", value);
         let push_data = DequeInstruction::PushFront {
             value: value.to_le_bytes().to_vec(),
         };
@@ -106,8 +108,8 @@ fn test_u64_deque(
     }
 
     // Push some values to the back
-    println!("\nPushing values to back: 300, 400");
-    for value in [300u64, 400u64] {
+    for value in [3u64, 4u64] {
+        println!("\nPushing {} to back.", value);
         let push_data = DequeInstruction::PushBack {
             value: value.to_le_bytes().to_vec(),
         };
@@ -134,9 +136,9 @@ fn test_u64_deque(
     );
 
     // Try to push one more (should have room now)
-    println!("\nPushing 500 to back");
+    println!("\nPushing 777 to back");
     let push_data = DequeInstruction::PushBack {
-        value: 500u64.to_le_bytes().to_vec(),
+        value: 777u64.to_le_bytes().to_vec(),
     };
     send_instruction(
         client,
@@ -164,8 +166,11 @@ fn test_u32_deque(
 ) {
     // Initialize deque for u32s (type 1)
     println!("Initializing Deque<u32, 10>...");
-    let init_data = borsh::to_vec(&DequeInstruction::Initialize { deque_type: 1 })
-        .expect("Failed to serialize");
+    let init_data = borsh::to_vec(&DequeInstruction::Initialize {
+        deque_type: DequeType::U32.into(),
+        num_slots: 10,
+    })
+    .expect("Failed to serialize");
 
     let init_instruction = Instruction::new_with_bytes(
         program_id,
@@ -194,13 +199,13 @@ fn test_u32_deque(
     // Push values alternating front and back
     println!("\nPushing values alternating front/back");
     let values: Vec<(u32, bool)> = vec![
-        (10, true),  // front
-        (20, false), // back
-        (30, true),  // front
-        (40, false), // back
-        (50, true),  // front
-        (60, false), // back
-        (70, true),  // front
+        (5, true),   // front
+        (6, false),  // back
+        (7, true),   // front
+        (8, false),  // back
+        (9, true),   // front
+        (10, false), // back
+        (11, true),  // front
     ];
 
     for (value, is_front) in values {
@@ -241,8 +246,8 @@ fn test_u32_deque(
     }
 
     // Add a couple more
-    println!("\nPushing 80 and 90 to back");
-    for value in [80u32, 90u32] {
+    println!("\nPushing 10 and 11 to back");
+    for value in [10u32, 11u32] {
         let push_data = DequeInstruction::PushBack {
             value: value.to_le_bytes().to_vec(),
         };
@@ -277,7 +282,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                 println!("\nRaw data (hex):");
                 let display_len = std::cmp::min(account.data.len(), 100);
                 for (i, chunk) in account.data[..display_len].chunks(16).enumerate() {
-                    print!("{:04x}: ", i * 16);
+                    print!("{:04}: ", i * 16);
                     for byte in chunk {
                         print!("{:02x} ", byte);
                     }
@@ -285,51 +290,60 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                 }
             }
 
-            // Try to deserialize as DequeAccount.
-            match DequeAccount::try_from_slice(&account.data) {
-                Ok(deque) => match deque {
-                    DequeAccount::FiveU64s(d) => {
-                        println!("Order(head→tail): {:?}", collect_from_head_u64(&d));
-                    }
-                    DequeAccount::TenU32s(d) => {
-                        println!("Order(head→tail): {:?}", collect_from_head_u32(&d));
-                    }
-                },
-                Err(e) => {
-                    println!("Failed to deserialize: {}", e);
+            let cloned_data = &mut account.data.clone();
+            let deque =
+                Deque::new_from_bytes(cloned_data).expect("Should be able to cast directly.");
+            if verbose {
+                println!(
+                "len: {}, deque_head: {:#?}, deque_tail: {:#?}, free_head: {:#?}, deque_type: {:#?}",
+                    deque.header.len,
+                    deque.header.deque_head,
+                    deque.header.deque_tail,
+                    deque.header.free_head,
+                    deque.header.deque_type,
+            );
+            }
+
+            match deque.header.get_type() {
+                DequeType::U32 => {
+                    let from_head = deque
+                        .iter_indices_from_head::<u32>()
+                        .map(|it| {
+                            *from_slot::<DequeNode<u32>>(deque.slots, it).expect("Should be valid.")
+                        })
+                        .collect::<Vec<DequeNode<u32>>>();
+                    // let free_head = from_slot::<DequeNode<u32>>(slots, header.free_head);
+                    println!(
+                        "{:?}",
+                        from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
+                    );
+                }
+                DequeType::U64 => {
+                    let from_head = deque
+                        .iter_indices_from_head::<u64>()
+                        .map(|it| {
+                            *from_slot::<DequeNode<u64>>(deque.slots, it).expect("Should be valid.")
+                        })
+                        .collect::<Vec<DequeNode<u64>>>();
+                    // let free_head = from_slot::<DequeNode<u64>>(slots, header.free_head);
+                    println!(
+                        "{:?}",
+                        from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
+                    );
                 }
             }
+
+            // println!("{:#?}", header);
+            // println!("{:#?}", slots);
+
+            // Try to deserialize as DequeAccount.
+            // match Deque::as_deque_mut(&account.data) {
+            // }
         }
         Err(e) => {
             println!("Failed to get account: {}", e);
         }
     }
-}
-
-fn collect_from_head_u64<const N: usize>(d: &Deque<u64, N>) -> Vec<u64> {
-    let mut out = Vec::new();
-    let mut cur: Link = d.head;
-    while cur != NIL {
-        let u = cur as usize;
-        if d.nodes[u].in_use {
-            out.push(d.nodes[u].data);
-        }
-        cur = d.nodes[u].next;
-    }
-    out
-}
-
-fn collect_from_head_u32<const N: usize>(d: &Deque<u32, N>) -> Vec<u32> {
-    let mut out = Vec::new();
-    let mut cur: Link = d.head;
-    while cur != NIL {
-        let u = cur as usize;
-        if d.nodes[u].in_use {
-            out.push(d.nodes[u].data);
-        }
-        cur = d.nodes[u].next;
-    }
-    out
 }
 
 fn send_instruction(
@@ -355,7 +369,7 @@ fn send_instruction(
     transaction.sign(&[payer], blockhash);
 
     match client.send_and_confirm_transaction(&transaction) {
-        Ok(_sig) => println!("  ✓ {} successful", operation),
+        Ok(sig) => println!("  ✓ {} successful, tx: {}", operation, sig),
         Err(e) => eprintln!("  ✗ {} failed: {}", operation, e),
     }
 

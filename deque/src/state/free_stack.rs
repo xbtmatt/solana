@@ -3,25 +3,25 @@ use solana_program::program_error::ProgramError;
 
 use crate::{
     state::DequeNode,
-    utils::{from_slab_bytes_mut, Slab, SlotIndex, NIL},
+    utils::{from_slot_mut, Slab, SlotIndex, NIL},
 };
 
 /// NIL/LAST are interchangeable within the context of the stack structure.
 const LAST: u32 = NIL;
 pub struct Stack<'a, T: Pod> {
-    head: SlotIndex,
-    data: &'a mut [u8],
-    phantom: std::marker::PhantomData<&'a T>,
+    pub head: SlotIndex,
+    pub data: &'a mut [u8],
+    pub phantom: std::marker::PhantomData<&'a T>,
 }
 
 #[derive(Clone, Copy, Zeroable)]
 #[repr(C)]
 pub struct StackNode<T> {
-    next: SlotIndex,
+    /// The zeroed inner payload bytes.
+    pub inner: T,
+    pub next: SlotIndex,
     /// Add a dummy field to align perfectly with the deque node.
     pub _dummy: SlotIndex,
-    /// The zeroed inner payload bytes.
-    inner: T,
 }
 
 unsafe impl<T: Pod> Pod for StackNode<T> {}
@@ -41,7 +41,7 @@ impl<'a, T: Pod> Stack<'a, T> {
     }
 
     pub fn push_to_free(&mut self, idx: SlotIndex) -> Result<(), ProgramError> {
-        let node: &mut StackNode<T> = from_slab_bytes_mut::<StackNode<T>>(self.data, idx)?;
+        let node: &mut StackNode<T> = from_slot_mut::<StackNode<T>>(self.data, idx)?;
         node.inner = T::zeroed();
         node.next = self.head;
         self.head = idx;
@@ -55,7 +55,7 @@ impl<'a, T: Pod> Stack<'a, T> {
         }
 
         let removed_idx = self.head;
-        let head = from_slab_bytes_mut::<StackNode<T>>(self.data, removed_idx)?;
+        let head = from_slot_mut::<StackNode<T>>(self.data, removed_idx)?;
         self.head = head.next;
 
         // Fully zero out the node by setting `next` to 0.
