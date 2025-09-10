@@ -25,8 +25,6 @@ pub struct Deque<'a> {
     pub sectors: &'a mut [u8],
 }
 
-pub type DequeValue = (DequeHeader, Vec<u8>);
-
 impl<'a> Deque<'a> {
     /// Construct a new, empty Deque, given an existing header and the deque type input.
     /// It's assumed that the data has already been allocated and aligned properly to the number
