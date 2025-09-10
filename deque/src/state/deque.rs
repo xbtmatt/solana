@@ -55,9 +55,6 @@ impl<'a> Deque<'a> {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        // TODO: Determine if this is necessary..? Do initialized accounts have zeroed out data already?
-        deque.slots[..space_needed].fill(0);
-
         match deque_type {
             DequeType::U32 => deque.init_free_stack::<u32>(num_slots as usize)?,
             DequeType::U64 => deque.init_free_stack::<u64>(num_slots as usize)?,

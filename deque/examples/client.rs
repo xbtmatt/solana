@@ -1,5 +1,5 @@
 use deque::{
-    state::{Deque, DequeInstruction, DequeNode, DequeType},
+    state::{Deque, DequeInstruction, DequeNode, DequeType, HEADER_FIXED_SIZE},
     utils::from_slot,
     PROGRAM_ID_PUBKEY,
 };
@@ -61,7 +61,8 @@ fn test_u64_deque(
     deque_account: &Keypair,
     program_id: Pubkey,
 ) {
-    println!("Initializing Deque<u64, 5>...");
+    // ------------------------------------- Initialization ----------------------------------------
+    println!("Initializing Deque<u64>...");
     let init_data = borsh::to_vec(&DequeInstruction::Initialize {
         deque_type: DequeType::U64.into(),
         num_slots: 5,
@@ -92,6 +93,7 @@ fn test_u64_deque(
         }
     }
 
+    // ---------------------------------------- Mutations ------------------------------------------
     for value in [7u64, 8u64] {
         println!("\nPushing {} to front.", value);
         let push_data = DequeInstruction::PushFront {
@@ -149,13 +151,57 @@ fn test_u64_deque(
         "push_back",
     );
 
-    // Read and display the account data
-    println!("\nFinal deque state:");
-    if let Ok(account) = client.get_account(&deque_account.pubkey()) {
-        println!("Account size: {} bytes", account.data.len());
-        // In a real scenario, you'd deserialize and iterate through the deque
-        // For now, just show that the account exists and has data
+    print_size_and_slots(client, deque_account);
+
+    // ----------------------------------------- Resize --------------------------------------------
+    println!("Resizing Deque<u64>...");
+    let additional_slots = 7;
+    let resize_data: Vec<u8> = borsh::to_vec(&DequeInstruction::Resize {
+        num_slots: additional_slots,
+    })
+    .expect("Failed to serialize.");
+
+    let resize_ixn = Instruction::new_with_bytes(
+        program_id,
+        &resize_data,
+        vec![
+            AccountMeta::new(deque_account.pubkey(), true),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program::id(), false),
+        ],
+    );
+
+    let mut transaction = Transaction::new_with_payer(&[resize_ixn], Some(&payer.pubkey()));
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get blockhash");
+    transaction.sign(&[payer, deque_account], blockhash);
+
+    match client.send_and_confirm_transaction(&transaction) {
+        Ok(sig) => println!("✓ Resized: {}", sig),
+        Err(e) => {
+            eprintln!("Failed to resize: {}", e);
+            return;
+        }
     }
+
+    // ---------------------------------------- Push more ------------------------------------------
+    let start = 71u64;
+    let end = start + additional_slots as u64;
+    for i in start..=end {
+        send_instruction(
+            client,
+            payer,
+            deque_account.pubkey(),
+            program_id,
+            DequeInstruction::PushFront {
+                value: i.to_le_bytes().to_vec(),
+            },
+            "push front",
+        );
+    }
+
+    print_size_and_slots(client, deque_account);
 }
 
 fn test_u32_deque(
@@ -164,8 +210,8 @@ fn test_u32_deque(
     deque_account: &Keypair,
     program_id: Pubkey,
 ) {
-    // Initialize deque for u32s (type 1)
-    println!("Initializing Deque<u32, 10>...");
+    // ------------------------------------- Initialization ----------------------------------------
+    println!("Initializing Deque<u32>...");
     let init_data = borsh::to_vec(&DequeInstruction::Initialize {
         deque_type: DequeType::U32.into(),
         num_slots: 10,
@@ -196,6 +242,7 @@ fn test_u32_deque(
         }
     }
 
+    // ---------------------------------------- Mutations ------------------------------------------
     // Push values alternating front and back
     println!("\nPushing values alternating front/back");
     let values: Vec<(u32, bool)> = vec![
@@ -261,14 +308,76 @@ fn test_u32_deque(
         );
     }
 
-    // Read and display the account data
-    println!("\nFinal deque state:");
-    if let Ok(account) = client.get_account(&deque_account.pubkey()) {
-        println!("Account size: {} bytes", account.data.len());
-        // Expected order after all operations (conceptually):
-        // Front: 70, 50, 30, (removed), 10, (removed), 20, 40, 60, 80, 90 :Back
+    print_size_and_slots(client, deque_account);
+
+    // ----------------------------------------- Resize --------------------------------------------
+    println!("Resizing Deque<u32>...");
+    let additional_slots = 3;
+    let resize_data: Vec<u8> = borsh::to_vec(&DequeInstruction::Resize {
+        num_slots: additional_slots,
+    })
+    .expect("Failed to serialize.");
+
+    let resize_ixn = Instruction::new_with_bytes(
+        program_id,
+        &resize_data,
+        vec![
+            AccountMeta::new(deque_account.pubkey(), true),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new_readonly(system_program::id(), false),
+        ],
+    );
+
+    let mut transaction = Transaction::new_with_payer(&[resize_ixn], Some(&payer.pubkey()));
+    let blockhash = client
+        .get_latest_blockhash()
+        .expect("Failed to get blockhash");
+    transaction.sign(&[payer, deque_account], blockhash);
+
+    match client.send_and_confirm_transaction(&transaction) {
+        Ok(sig) => println!("✓ Resized: {}", sig),
+        Err(e) => {
+            eprintln!("Failed to resize: {}", e);
+            return;
+        }
+    }
+
+    print_size_and_slots(client, deque_account);
+
+    // ---------------------------------------- Push more ------------------------------------------
+    let start = 31u32;
+    let end = start + additional_slots as u32;
+    for i in start..=end {
+        send_instruction(
+            client,
+            payer,
+            deque_account.pubkey(),
+            program_id,
+            DequeInstruction::PushFront {
+                value: i.to_le_bytes().to_vec(),
+            },
+            "push front",
+        );
+    }
+
+    // --------------------------------------- Print size ------------------------------------------
+}
+
+fn print_size_and_slots(client: &RpcClient, account: &Keypair) {
+    if let Ok(account) = client.get_account(&account.pubkey()) {
+        let cloned_data = &mut account.data.clone();
+        let deque =
+            Deque::new_from_bytes(cloned_data).expect("Should be able to deserialize into Deque.");
+        let slot_size = deque.header.get_type().slot_size();
+        let len = account.data.len();
+        println!(
+            "\nAccount size: {} bytes, {} slots\n",
+            len,
+            (len - HEADER_FIXED_SIZE) / slot_size
+        );
     }
 }
+
 fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
     match client.get_account(account_pubkey) {
         Ok(account) => {

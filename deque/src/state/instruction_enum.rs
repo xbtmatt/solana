@@ -8,4 +8,5 @@ pub enum DequeInstruction {
     PushFront { value: Vec<u8> },
     PushBack { value: Vec<u8> },
     Remove { index: SlotIndex },
+    Resize { num_slots: u16 },
 }

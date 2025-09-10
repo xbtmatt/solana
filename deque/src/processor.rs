@@ -25,5 +25,8 @@ pub fn process_instruction(
         DequeInstruction::Remove { index } => {
             instructions::remove::process(program_id, accounts, index)
         }
+        DequeInstruction::Resize { num_slots } => {
+            instructions::resize::process(program_id, accounts, num_slots)
+        }
     }
 }

@@ -1,0 +1,93 @@
+use solana_program::{
+    account_info::{next_account_info, AccountInfo},
+    entrypoint::ProgramResult,
+    msg,
+    program::invoke,
+    program_error::ProgramError,
+    pubkey::Pubkey,
+    rent::Rent,
+    system_instruction,
+    sysvar::Sysvar,
+};
+
+use crate::{
+    state::{Deque, DequeType, Stack, HEADER_FIXED_SIZE},
+    utils::{check_owned_and_writable, SlotIndex},
+};
+
+pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_slots: u16) -> ProgramResult {
+    msg!("Adding {} slots.", num_slots);
+
+    if num_slots < 1 {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let accounts_iter = &mut accounts.iter();
+    let deque_account = next_account_info(accounts_iter)?;
+    let payer_account = next_account_info(accounts_iter)?;
+    let system_program = next_account_info(accounts_iter)?;
+
+    check_owned_and_writable(deque_account)?;
+
+    let mut deque_data = deque_account.try_borrow_mut_data()?;
+    let current_size = deque_data.len();
+    let current_lamports = deque_account.lamports();
+
+    let deque = Deque::new_from_bytes(&mut deque_data)?;
+    let deque_type = deque.header.get_type();
+    let slot_size = deque_type.slot_size();
+
+    drop(deque_data);
+
+    let additional_space = slot_size * (num_slots as usize);
+    let new_account_space = current_size + additional_space;
+
+    let new_lamports_required = Rent::get()?.minimum_balance(new_account_space);
+
+    let lamports_diff = new_lamports_required.saturating_sub(current_lamports);
+
+    if lamports_diff > 0 {
+        invoke(
+            &system_instruction::transfer(payer_account.key, deque_account.key, lamports_diff),
+            &[
+                payer_account.clone(),
+                deque_account.clone(),
+                system_program.clone(),
+            ],
+        )?;
+    }
+
+    // Zero init is a waste of compute unless an account shrinks and then grows in the same txn.
+    // See: https://solana.com/developers/courses/program-optimization/program-architecture#data-optimization
+    //
+    // > Memory used to grow is already zero-initialized upon program entrypoint and re-zeroing it wastes compute units.
+    // > If within the same call a program reallocs from larger to smaller and back to larger again the new space could contain stale data.
+    // > Pass true for zero_init in this case, otherwise compute units will be wasted re-zero-initializing.
+    deque_account.realloc(new_account_space, false)?;
+
+    // Now chain the old slots to the new slots in the stack of free nodes.
+    let mut deque_data = deque_account.data.borrow_mut();
+    let deque = Deque::new_from_bytes(&mut deque_data)?;
+
+    let curr_n_slots = (current_size - HEADER_FIXED_SIZE) / slot_size;
+    let new_n_slots = curr_n_slots + num_slots as usize;
+
+    match deque_type {
+        DequeType::U32 => {
+            let mut free = Stack::<u32>::new(deque.slots, deque.header.free_head);
+            for i in curr_n_slots..new_n_slots {
+                free.push_to_free(i as SlotIndex)?;
+            }
+            deque.header.free_head = free.get_head();
+        }
+        DequeType::U64 => {
+            let mut free = Stack::<u64>::new(deque.slots, deque.header.free_head);
+            for i in curr_n_slots..new_n_slots {
+                free.push_to_free(i as SlotIndex)?;
+            }
+            deque.header.free_head = free.get_head();
+        }
+    }
+
+    Ok(())
+}
