@@ -77,6 +77,12 @@ pub fn process(
     )?;
 
     // TODO: Check if the user already has existing funds within the deque.
+    // Ideally they're consolidated into a single node.
+    // I believe it's possible to validate/verify that a client-passed-in memory address is a valid
+    // node for a user without having to traverse it in the smart contract, since the sector sizes
+    // will be fixed and aligned. Simply verify the pubkey matches and then operate from there.
+    // If this is too complex and/or unsafe, just traverse the deque.
+
     // Now push a node indicating that this user has escrowed tokens.
     deque
         .push_front(MarketEscrow::new(*payer.key, base_amt, quote_amt))
