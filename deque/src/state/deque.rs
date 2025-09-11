@@ -4,10 +4,7 @@ use static_assertions::const_assert_eq;
 
 use crate::{
     state::{DequeHeader, DequeType, MarketEscrow, Stack, StackNode, HEADER_FIXED_SIZE},
-    utils::{
-        from_sector_idx, from_sector_idx_mut, from_slab_bytes, from_slab_bytes_mut, SectorIndex,
-        Slab, NIL,
-    },
+    utils::{from_sector_idx, from_sector_idx_mut, from_slab_bytes_mut, SectorIndex, Slab, NIL},
 };
 
 #[derive(Clone, Copy, Debug, Zeroable)]
@@ -47,7 +44,6 @@ impl<'a> Deque<'a> {
         deque_type: DequeType,
         num_sectors: u16,
         deque_bump: u8,
-        vault_ctx: (&Pubkey, u8),
         base_mint: &Pubkey,
         quote_mint: &Pubkey,
     ) -> Result<(), ProgramError> {
@@ -55,13 +51,9 @@ impl<'a> Deque<'a> {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let (vault, vault_bump) = vault_ctx;
-
         let mut deque = Deque::new_from_bytes(data)?;
         // Write a new empty header to the `deque.header`
-        *deque.header = DequeHeader::new_empty(
-            deque_type, vault, deque_bump, vault_bump, base_mint, quote_mint,
-        );
+        *deque.header = DequeHeader::new_empty(deque_type, deque_bump, base_mint, quote_mint);
 
         let sector_size = deque_type.sector_size();
         debug_assert_eq!(deque.sectors.len() % sector_size, 0);

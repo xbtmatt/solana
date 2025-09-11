@@ -1,5 +1,5 @@
 use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, msg, program::invoke,
+    account_info::AccountInfo, entrypoint::ProgramResult, program::invoke,
     program_error::ProgramError, pubkey::Pubkey,
 };
 
@@ -17,7 +17,6 @@ pub fn process(
     let MarketChoiceContext {
         deque_account,
         payer,
-        vault,
         payer_ata,
         token_program,
         vault_ata,
@@ -61,7 +60,6 @@ pub fn process(
     deque
         .push_front(escrow)
         .map_err(|_| ProgramError::InvalidAccountData)?;
-    msg!("Pushed market escrow to front.");
 
     Ok(())
 }

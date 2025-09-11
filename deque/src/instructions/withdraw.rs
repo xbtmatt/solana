@@ -5,9 +5,8 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
+    deque_seeds_with_bump,
     state::{Deque, MarketEscrow, MarketEscrowChoice},
-    utils::log_bytes,
-    vault_seeds_with_bump,
 };
 
 pub fn process(
@@ -18,20 +17,29 @@ pub fn process(
     let MarketChoiceContext {
         deque_account,
         payer,
-        vault,
         payer_ata,
         token_program,
         vault_ata,
     } = MarketChoiceContext::load(accounts, &choice)?;
 
     let mut data = deque_account.data.borrow_mut();
-    let mut deque = Deque::new_from_bytes(&mut data)?;
+    let deque = Deque::new_from_bytes(&mut data)?;
 
     // Try to find a node with the payer.
     let escrow_and_idx = deque
         .iter_nodes::<MarketEscrow>()
         .find(|(node, _)| node.trader.as_ref() == payer.key.as_ref())
         .map(|(node, idx)| (*node, idx));
+
+    // Copy these before the deque data is dropped.
+    let (base_mint, quote_mint, deque_bump) = (
+        deque.header.base_mint,
+        deque.header.quote_mint,
+        deque.header.deque_bump,
+    );
+
+    // Drop the deque account data ref so it's possible to call transfer.
+    drop(data);
 
     match escrow_and_idx {
         Some((escrow, idx)) => {
@@ -42,7 +50,7 @@ pub fn process(
                     token_program.key,
                     vault_ata.key,
                     payer_ata.key,
-                    vault.key,
+                    deque_account.key,
                     &[],
                     amount,
                 )?,
@@ -50,21 +58,19 @@ pub fn process(
                     token_program.as_ref().clone(),
                     vault_ata.as_ref().clone(),
                     payer_ata.as_ref().clone(),
-                    vault.as_ref().clone(),
+                    deque_account.as_ref().clone(),
                 ],
-                vault_seeds_with_bump!(
-                    &deque_account.key,
-                    &deque.header.base_mint,
-                    &deque.header.quote_mint,
-                    deque.header.vault_bump
-                ),
+                deque_seeds_with_bump!(base_mint, quote_mint, deque_bump),
             )?;
+
+            let mut data = deque_account.data.borrow_mut();
+            let mut deque = Deque::new_from_bytes(&mut data)?;
 
             // And remove the node from the deque.
             deque
                 .remove::<MarketEscrow>(idx)
                 .map_err(|_| ProgramError::InvalidAccountData)?;
-            msg!("Withdrawing {} coins");
+            msg!("Withdrawing {} coins", amount);
         }
         None => {
             msg!("Trader has no active escrow");

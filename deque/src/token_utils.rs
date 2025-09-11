@@ -1,22 +1,12 @@
 use solana_program::{
-    account_info::AccountInfo,
-    program::{invoke, invoke_signed},
-    program_error::ProgramError,
-    program_pack::Pack,
-    pubkey::Pubkey,
-    rent::Rent,
-    system_instruction::create_account,
-    sysvar::Sysvar,
+    account_info::AccountInfo, program::invoke, program_error::ProgramError, pubkey::Pubkey,
 };
-
-use crate::vault_seeds_with_bump;
 
 pub fn create_token_vault<'a, 'info>(
     payer: &'a AccountInfo<'info>,
-    deque: &Pubkey,
+    deque_account: &'a AccountInfo<'info>,
     base_and_quote_mints: (&'a AccountInfo<'info>, &'a AccountInfo<'info>),
     vault_base_and_quote_atas: (&'a AccountInfo<'info>, &'a AccountInfo<'info>),
-    vault_ctx: (&'a AccountInfo<'info>, u8),
     program_accounts: (
         &'a AccountInfo<'info>,
         &'a AccountInfo<'info>,
@@ -26,39 +16,20 @@ pub fn create_token_vault<'a, 'info>(
     let (token_program, spl_ata_program, system_program) = program_accounts;
     let (base_mint, quote_mint) = base_and_quote_mints;
     let (vault_base_ata, vault_quote_ata) = vault_base_and_quote_atas;
-    let (vault, vault_bump) = vault_ctx;
-    let space = spl_token::state::Account::LEN;
-
-    invoke_signed(
-        &create_account(
-            payer.key,
-            vault.key,
-            Rent::get()?.minimum_balance(space),
-            space as u64,
-            token_program.key,
-        ),
-        &[payer.clone(), vault.clone(), system_program.clone()],
-        vault_seeds_with_bump!(
-            deque.as_ref().to_vec(),
-            base_mint.key,
-            quote_mint.key,
-            vault_bump
-        ),
-    )?;
 
     // Then create the associated token accounts for the vault.
     for (ata, mint) in [(vault_base_ata, base_mint), (vault_quote_ata, quote_mint)] {
         invoke(
             &spl_associated_token_account::instruction::create_associated_token_account(
                 payer.key,
-                vault.key,
+                deque_account.key,
                 mint.key,
                 token_program.key,
             ),
             &[
                 payer.clone(),
                 ata.clone(),
-                vault.clone(),
+                deque_account.clone(),
                 mint.clone(),
                 system_program.clone(),
                 spl_ata_program.clone(),

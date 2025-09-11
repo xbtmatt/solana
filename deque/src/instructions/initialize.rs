@@ -14,7 +14,7 @@ use crate::{
     deque_seeds_with_bump,
     state::{Deque, DequeType, HEADER_FIXED_SIZE},
     token_utils::create_token_vault,
-    utils::check_derivations_and_get_bumps,
+    utils::check_derivations_and_get_bump,
 };
 
 pub fn process(
@@ -34,7 +34,6 @@ pub fn process(
     let deque_account = next_account_info(accounts_iter)?;
     let payer = next_account_info(accounts_iter)?;
     let system_program = next_account_info(accounts_iter)?;
-    let vault = next_account_info(accounts_iter)?;
     let token_program = next_account_info(accounts_iter)?;
     let vault_base_ata = next_account_info(accounts_iter)?;
     let vault_quote_ata = next_account_info(accounts_iter)?;
@@ -46,12 +45,8 @@ pub fn process(
         return Err(ProgramError::InvalidInstructionData);
     }
 
-    let (deque_bump, vault_bump) = check_derivations_and_get_bumps(
-        deque_account,
-        vault,
-        base_mint_acc.key,
-        quote_mint_acc.key,
-    )?;
+    let deque_bump =
+        check_derivations_and_get_bump(deque_account, base_mint_acc.key, quote_mint_acc.key)?;
 
     let sector_size = deque_type.sector_size();
     let account_space = HEADER_FIXED_SIZE + sector_size * (num_sectors as usize);
@@ -73,10 +68,9 @@ pub fn process(
     // Create the token vault.
     create_token_vault(
         payer,
-        deque_account.key,
+        deque_account,
         (base_mint_acc, quote_mint_acc),
         (vault_base_ata, vault_quote_ata),
-        (vault, vault_bump),
         (token_program, spl_ata_program, system_program),
     )?;
 
@@ -87,7 +81,6 @@ pub fn process(
             deque_type,
             num_sectors,
             deque_bump,
-            (vault.key, vault_bump),
             base_mint_acc.key,
             quote_mint_acc.key,
         )?;

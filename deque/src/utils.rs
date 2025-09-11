@@ -1,9 +1,6 @@
 use solana_program::{account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey};
 
-use crate::{
-    state::{get_deque_address, get_vault_address},
-    PROGRAM_ID_PUBKEY,
-};
+use crate::{state::get_deque_address, PROGRAM_ID_PUBKEY};
 
 /// The ordinal `sector` index in the slab of bytes dedicated to inner data for a type.
 /// That is, to get the raw bytes offset, it is multiplied by the sector type's sector size.
@@ -96,20 +93,15 @@ pub fn check_owned_and_writable(account: &AccountInfo) -> Result<(), ProgramErro
 }
 
 #[inline(always)]
-pub fn check_derivations_and_get_bumps(
+pub fn check_derivations_and_get_bump(
     deque_account: &AccountInfo,
-    vault_account: &AccountInfo,
     base_mint: &Pubkey,
     quote_mint: &Pubkey,
-) -> Result<(u8, u8), ProgramError> {
+) -> Result<u8, ProgramError> {
     let (deque_pub, deque_bump) = get_deque_address(base_mint, quote_mint);
     if deque_pub.as_array() != deque_account.key.as_array() {
         return Err(ProgramError::InvalidAccountData);
     }
-    let (vault_pub, vault_bump) = get_vault_address(&deque_pub, base_mint, quote_mint);
-    if vault_pub.as_array() != vault_account.key.as_array() {
-        return Err(ProgramError::InvalidAccountData);
-    }
 
-    Ok((deque_bump, vault_bump))
+    Ok(deque_bump)
 }

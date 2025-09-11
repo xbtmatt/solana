@@ -13,7 +13,6 @@ use crate::{
 pub struct MarketChoiceContext<'a, 'info> {
     pub deque_account: &'a AccountInfo<'info>,
     pub payer: &'a AccountInfo<'info>,
-    pub vault: &'a AccountInfo<'info>,
     pub payer_ata: &'a AccountInfo<'info>,
     pub token_program: &'a AccountInfo<'info>,
     pub vault_ata: &'a AccountInfo<'info>,
@@ -27,7 +26,6 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
         let accounts_iter = &mut accounts.iter();
         let deque_account = next_account_info(accounts_iter)?;
         let payer = next_account_info(accounts_iter)?;
-        let vault = next_account_info(accounts_iter)?;
         let payer_ata = next_account_info(accounts_iter)?;
         let token_program = next_account_info(accounts_iter)?;
         let mint_in = next_account_info(accounts_iter)?;
@@ -35,6 +33,7 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
 
         let mut data = deque_account.data.borrow_mut();
         let deque = Deque::new_from_bytes(&mut data)?;
+        deque.header.verify_discriminant()?;
 
         // Ensure it's a market deque.
         match deque.header.get_type() {
@@ -42,7 +41,6 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
             // Not supported. Will remove later.
             _ => return Err(ProgramError::InvalidInstructionData),
         }
-
         check_owned_and_writable(deque_account)?;
 
         let mint = match choice {
@@ -51,21 +49,18 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
         };
 
         // Ensure the mint pubkey passed into account data matches the mint in header data.
-        if mint_in.key.as_ref() != mint.as_ref()
-            || vault.key.as_ref() != deque.header.vault.as_ref()
-        {
+        if mint_in.key.as_ref() != mint.as_ref() {
             return Err(ProgramError::IllegalOwner);
         }
 
         let (payer_ata, vault_ata) = (
             TokenAccountInfo::new_checked_owners(payer_ata, &mint, payer.key)?.info,
-            TokenAccountInfo::new_checked_owners(vault_ata, &mint, &deque.header.vault)?.info,
+            TokenAccountInfo::new_checked_owners(vault_ata, &mint, deque_account.key)?.info,
         );
 
         Ok(MarketChoiceContext {
             deque_account,
             payer,
-            vault,
             payer_ata,
             token_program,
             vault_ata,

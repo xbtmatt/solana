@@ -47,40 +47,7 @@ macro_rules! deque_seeds_with_bump {
     };
 }
 
-#[macro_export]
-macro_rules! vault_seeds {
-    ( $deque:expr, $base_mint:expr, $quote_mint:expr ) => {
-        &[
-            $deque.as_ref(),
-            $base_mint.as_ref(),
-            $quote_mint.as_ref(),
-            b"vault",
-        ]
-    };
-}
-
-#[macro_export]
-macro_rules! vault_seeds_with_bump {
-    ( $deque:expr, $base_mint:expr, $quote_mint:expr, $bump:expr) => {
-        &[&[
-            $deque.as_ref(),
-            $base_mint.as_ref(),
-            $quote_mint.as_ref(),
-            b"vault",
-            &[$bump],
-        ]]
-    };
-}
-
 /// Get the main storage/deque account and its associated bump.
 pub fn get_deque_address(base_mint: &Pubkey, quote_mint: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(deque_seeds!(base_mint, quote_mint), &PROGRAM_ID_PUBKEY)
-}
-
-/// Get the vault PDA and its associated bump.
-pub fn get_vault_address(deque: &Pubkey, base_mint: &Pubkey, quote_mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        vault_seeds!(deque, base_mint, quote_mint),
-        &PROGRAM_ID_PUBKEY,
-    )
 }

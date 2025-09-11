@@ -1,7 +1,7 @@
 use deque::{
     state::{
-        get_deque_address, get_vault_address, Deque, DequeInstruction, DequeNode, DequeType,
-        MarketEscrow, MarketEscrowChoice, HEADER_FIXED_SIZE,
+        get_deque_address, Deque, DequeInstruction, DequeNode, DequeType, MarketEscrow,
+        MarketEscrowChoice, HEADER_FIXED_SIZE,
     },
     utils::from_sector_idx,
     PROGRAM_ID_PUBKEY,
@@ -62,10 +62,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     let (base_mint, _payer_base_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
     let (quote_mint, _payer_quote_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
     let (deque_pubkey, _deque_bump) = get_deque_address(&base_mint, &quote_mint);
-    let (vault_pubkey, _vault_bump) = get_vault_address(&deque_pubkey, &base_mint, &quote_mint);
 
     println!("deque pubkey {:#?}", deque_pubkey.to_string());
-    println!("vault pubkey {:#?}", vault_pubkey.to_string());
     println!("base mint pubkey {:#?}", base_mint.to_string());
     println!("quote mint pubkey {:#?}", quote_mint.to_string());
 
@@ -77,8 +75,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     .expect("Failed to serialize");
 
     let (vault_base_ata, vault_quote_ata) = (
-        get_associated_token_address(&vault_pubkey, &base_mint),
-        get_associated_token_address(&vault_pubkey, &quote_mint),
+        get_associated_token_address(&deque_pubkey, &base_mint),
+        get_associated_token_address(&deque_pubkey, &quote_mint),
     );
 
     let init_instruction = Instruction::new_with_bytes(
@@ -88,7 +86,6 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new(vault_pubkey, false),
             AccountMeta::new_readonly(spl_token::id(), false),
             // For the ATA creation inside the program.
             AccountMeta::new(vault_base_ata, false),
@@ -124,14 +121,13 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     );
 
     let payer_ata = get_associated_token_address(&payer.pubkey(), &base_mint);
-    println!("vault_pubkey {:#?}", vault_pubkey.to_string());
     println!("payer_ata {:#?}", payer_ata.to_string());
 
     // ----------------------------------------- Deposit -------------------------------------------
     println!(
         "Payer balance before: {:?}\nVault balance before: {:?}",
         get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &vault_pubkey, &base_mint)
+        get_token_balance(rpc, &deque_pubkey, &base_mint)
     );
 
     let deposit_ixn = Instruction::new_with_borsh(
@@ -143,7 +139,6 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
         vec![
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new(vault_pubkey, false),
             AccountMeta::new(payer_ata, false),
             AccountMeta::new_readonly(spl_token::id(), false),
             AccountMeta::new_readonly(base_mint, false),
@@ -162,7 +157,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     println!(
         "Payer balance after: {:?}\nVault balance after: {:?}",
         get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &vault_pubkey, &base_mint)
+        get_token_balance(rpc, &deque_pubkey, &base_mint)
     );
 
     inspect_account(rpc, &deque_pubkey, false);
@@ -171,7 +166,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     println!(
         "Payer balance before: {:?}\nVault balance before: {:?}",
         get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &vault_pubkey, &base_mint)
+        get_token_balance(rpc, &deque_pubkey, &base_mint)
     );
 
     let withdraw_ixn = Instruction::new_with_borsh(
@@ -182,7 +177,6 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
         vec![
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new(vault_pubkey, false),
             AccountMeta::new(payer_ata, false),
             AccountMeta::new_readonly(spl_token::id(), false),
             AccountMeta::new_readonly(base_mint, false),
@@ -201,7 +195,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     println!(
         "Payer balance after: {:?}\nVault balance after: {:?}",
         get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &vault_pubkey, &base_mint)
+        get_token_balance(rpc, &deque_pubkey, &base_mint)
     );
 
     inspect_account(rpc, &deque_pubkey, false);
@@ -429,10 +423,9 @@ fn test_u64_deque(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     let (base_mint, _base_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
     let (quote_mint, _quote_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
     let (deque_pubkey, _deque_bump) = get_deque_address(&base_mint, &quote_mint);
-    let (vault_pubkey, _vault_bump) = get_vault_address(&deque_pubkey, &base_mint, &quote_mint);
 
     println!("deque pubkey {:#?}", deque_pubkey.to_string());
-    println!("vault pubkey {:#?}", vault_pubkey.to_string());
+    println!("vault pubkey {:#?}", deque_pubkey.to_string());
     println!("base mint pubkey {:#?}", base_mint.to_string());
     println!("quote mint  pubkey {:#?}", quote_mint.to_string());
 
@@ -451,7 +444,6 @@ fn test_u64_deque(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program::id(), false),
-            AccountMeta::new(vault_pubkey, false),
             AccountMeta::new_readonly(spl_token::id(), false),
         ],
     );
