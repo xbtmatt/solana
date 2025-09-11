@@ -33,17 +33,6 @@ pub fn process(
         .find(|(node, _)| node.trader.as_ref() == payer.key.as_ref())
         .map(|(node, idx)| (*node, idx));
 
-    msg!("deque");
-    log_bytes(deque_account.key.as_ref());
-    msg!("payer");
-    log_bytes(payer.key.as_ref());
-    msg!("vault");
-    log_bytes(vault.key.as_ref());
-    msg!("payer_ata");
-    log_bytes(payer_ata.key.as_ref());
-    msg!("vault_ata");
-    log_bytes(vault_ata.key.as_ref());
-
     match escrow_and_idx {
         Some((escrow, idx)) => {
             let amount = escrow.amount_from_choice(choice);
