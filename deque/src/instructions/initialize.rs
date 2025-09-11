@@ -12,23 +12,13 @@ use solana_program::{
 
 use crate::{
     deque_seeds_with_bump,
-    state::{Deque, DequeType, HEADER_FIXED_SIZE},
+    state::{Deque, HEADER_FIXED_SIZE},
     token_utils::create_token_vault,
-    utils::check_derivations_and_get_bump,
+    utils::{check_derivations_and_get_bump, SECTOR_SIZE},
 };
 
-pub fn process(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
-    deque_ty: u8,
-    num_sectors: u16,
-) -> ProgramResult {
-    let deque_type = DequeType::try_from(deque_ty)?;
-    msg!(
-        "Initialize deque type: {:#?} with {:?} sector(s)",
-        deque_type,
-        num_sectors
-    );
+pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) -> ProgramResult {
+    msg!("Initialize deque with {:?} sector(s)", num_sectors);
 
     let accounts_iter = &mut accounts.iter();
     let deque_account = next_account_info(accounts_iter)?;
@@ -48,8 +38,7 @@ pub fn process(
     let deque_bump =
         check_derivations_and_get_bump(deque_account, base_mint_acc.key, quote_mint_acc.key)?;
 
-    let sector_size = deque_type.sector_size();
-    let account_space = HEADER_FIXED_SIZE + sector_size * (num_sectors as usize);
+    let account_space = HEADER_FIXED_SIZE + SECTOR_SIZE * (num_sectors as usize);
     let lamports_required = Rent::get()?.minimum_balance(account_space);
 
     // Create the deque PDA.
@@ -78,7 +67,6 @@ pub fn process(
         let mut data = deque_account.try_borrow_mut_data()?;
         Deque::init_deque_account(
             &mut data,
-            deque_type,
             num_sectors,
             deque_bump,
             base_mint_acc.key,

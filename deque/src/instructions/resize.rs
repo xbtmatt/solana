@@ -12,8 +12,8 @@ use solana_program::{
 
 use crate::{
     deque_seeds_with_bump,
-    state::{Deque, DequeType, Stack, HEADER_FIXED_SIZE},
-    utils::{check_owned_and_writable, SectorIndex},
+    state::{Deque, MarketEscrow, Stack, HEADER_FIXED_SIZE},
+    utils::{check_owned_and_writable, SectorIndex, SECTOR_SIZE},
 };
 
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) -> ProgramResult {
@@ -34,8 +34,6 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
     let current_lamports = deque_account.lamports();
 
     let deque = Deque::new_from_bytes(&mut deque_data)?;
-    let deque_type = deque.header.get_type();
-    let sector_size = deque_type.sector_size();
 
     let (base_mint, quote_mint, deque_bump) = (
         deque.header.base_mint,
@@ -45,11 +43,9 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
 
     drop(deque_data);
 
-    let additional_space = sector_size * (num_sectors as usize);
+    let additional_space = SECTOR_SIZE * (num_sectors as usize);
     let new_account_space = current_size + additional_space;
-
     let new_lamports_required = Rent::get()?.minimum_balance(new_account_space);
-
     let lamports_diff = new_lamports_required.saturating_sub(current_lamports);
 
     if lamports_diff > 0 {
@@ -64,42 +60,22 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
         )?;
     }
 
-    // Zero init is a waste of compute unless an account shrinks and then grows in the same txn.
+    // "Memory used to grow is already zero-initialized upon program entrypoint and re-zeroing it wastes compute units."
     // See: https://solana.com/developers/courses/program-optimization/program-architecture#data-optimization
-    //
-    // > Memory used to grow is already zero-initialized upon program entrypoint and re-zeroing it wastes compute units.
-    // > If within the same call a program reallocs from larger to smaller and back to larger again the new space could contain stale data.
-    // > Pass true for zero_init in this case, otherwise compute units will be wasted re-zero-initializing.
     deque_account.realloc(new_account_space, false)?;
 
     // Now chain the old sectors to the new sectors in the stack of free nodes.
     let mut deque_data = deque_account.data.borrow_mut();
     let deque = Deque::new_from_bytes(&mut deque_data)?;
 
-    let curr_n_sectors = (current_size - HEADER_FIXED_SIZE) / sector_size;
+    let curr_n_sectors = (current_size - HEADER_FIXED_SIZE) / SECTOR_SIZE;
     let new_n_sectors = curr_n_sectors + num_sectors as usize;
 
-    // NOTE: This currently is O(n) writes for n new sectors. Technically, this could be O(1) by
-    // overlaying the slab directly
-    match deque_type {
-        DequeType::U32 => {
-            let mut free = Stack::<u32>::new(deque.sectors, deque.header.free_head);
-            for i in curr_n_sectors..new_n_sectors {
-                free.push_to_free(i as SectorIndex)?;
-            }
-            deque.header.free_head = free.get_head();
-        }
-        DequeType::U64 => {
-            let mut free = Stack::<u64>::new(deque.sectors, deque.header.free_head);
-            for i in curr_n_sectors..new_n_sectors {
-                free.push_to_free(i as SectorIndex)?;
-            }
-            deque.header.free_head = free.get_head();
-        }
-        DequeType::Market => {
-            todo!();
-        }
+    let mut free = Stack::<MarketEscrow>::new(deque.sectors, deque.header.free_head);
+    for i in curr_n_sectors..new_n_sectors {
+        free.push_to_free(i as SectorIndex)?;
     }
+    deque.header.free_head = free.get_head();
 
     Ok(())
 }

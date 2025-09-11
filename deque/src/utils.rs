@@ -1,11 +1,15 @@
 use solana_program::{account_info::AccountInfo, msg, program_error::ProgramError, pubkey::Pubkey};
 
-use crate::{state::get_deque_address, PROGRAM_ID_PUBKEY};
+use crate::{
+    state::{get_deque_address, DequeNode, MarketEscrow},
+    PROGRAM_ID_PUBKEY,
+};
 
 /// The ordinal `sector` index in the slab of bytes dedicated to inner data for a type.
 /// That is, to get the raw bytes offset, it is multiplied by the sector type's sector size.
 pub type SectorIndex = u32;
 pub const NIL: SectorIndex = SectorIndex::MAX;
+pub const SECTOR_SIZE: usize = size_of::<DequeNode<MarketEscrow>>();
 
 /// Below is taken directly from:
 /// https://github.com/solana-program/libraries/blob/main/pod/src/primitives.rs

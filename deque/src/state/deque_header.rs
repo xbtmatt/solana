@@ -1,7 +1,4 @@
-use crate::{
-    state::{DequeNode, MarketEscrow},
-    utils::{SectorIndex, Slab, NIL},
-};
+use crate::utils::{SectorIndex, Slab, NIL};
 use bytemuck::{Pod, Zeroable};
 use solana_program::{program_error::ProgramError, pubkey::Pubkey};
 use static_assertions::const_assert_eq;
@@ -9,51 +6,12 @@ use static_assertions::const_assert_eq;
 pub const DEQUE_ACCOUNT_DISCRIMINANT: u64 = 0xf00dbabe;
 pub const HEADER_FIXED_SIZE: usize = 96;
 
-#[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Zeroable)]
-pub enum DequeType {
-    U32,
-    U64,
-    Market,
-}
-
-impl TryFrom<u8> for DequeType {
-    type Error = ProgramError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::U32),
-            1 => Ok(Self::U64),
-            2 => Ok(Self::Market),
-            _ => Err(ProgramError::InvalidAccountData),
-        }
-    }
-}
-
-impl From<DequeType> for u8 {
-    fn from(dt: DequeType) -> u8 {
-        dt as u8
-    }
-}
-
-impl DequeType {
-    #[inline(always)]
-    pub fn sector_size(self) -> usize {
-        match self {
-            DequeType::U32 => size_of::<DequeNode<u32>>(),
-            DequeType::U64 => size_of::<DequeNode<u64>>(),
-            DequeType::Market => size_of::<DequeNode<MarketEscrow>>(),
-        }
-    }
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Zeroable)]
 pub struct DequeHeader {
     pub discriminant: u64,
     pub version: u8,
-    pub deque_type: u8,
-    pub _padding: [u8; 2],
+    pub _padding: [u8; 3],
     pub len: SectorIndex,
     pub free_head: SectorIndex,
     pub deque_head: SectorIndex,
@@ -69,17 +27,11 @@ unsafe impl Pod for DequeHeader {}
 impl Slab for DequeHeader {}
 
 impl DequeHeader {
-    pub fn new_empty(
-        deque_type: DequeType,
-        deque_bump: u8,
-        base_mint: &Pubkey,
-        quote_mint: &Pubkey,
-    ) -> Self {
+    pub fn new_empty(deque_bump: u8, base_mint: &Pubkey, quote_mint: &Pubkey) -> Self {
         DequeHeader {
             discriminant: DEQUE_ACCOUNT_DISCRIMINANT,
-            deque_type: deque_type.into(),
             version: 0,
-            _padding: [0; 2],
+            _padding: [0; 3],
             len: 0,
             free_head: NIL,
             deque_head: NIL,
@@ -89,13 +41,6 @@ impl DequeHeader {
             base_mint: *base_mint,
             quote_mint: *quote_mint,
         }
-    }
-
-    #[inline]
-    pub fn get_type(&self) -> DequeType {
-        self.deque_type
-            .try_into()
-            .expect("Deque type should have already been validated.")
     }
 
     #[inline]
@@ -113,8 +58,7 @@ const_assert_eq!(
     HEADER_FIXED_SIZE,
     8 + // discriminant
     1 + // version
-    1 + // deque type
-    2 + // padding
+    3 + // padding
     4 + // len
     4 + // free_head
     4 + // deque_head

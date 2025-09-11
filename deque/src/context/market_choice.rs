@@ -4,7 +4,7 @@ use solana_program::{
 };
 
 use crate::{
-    state::{Deque, DequeType, MarketEscrowChoice},
+    state::{Deque, MarketEscrowChoice},
     token_utils::TokenAccountInfo,
     utils::check_owned_and_writable,
 };
@@ -34,13 +34,6 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
         let mut data = deque_account.data.borrow_mut();
         let deque = Deque::new_from_bytes(&mut data)?;
         deque.header.verify_discriminant()?;
-
-        // Ensure it's a market deque.
-        match deque.header.get_type() {
-            DequeType::Market => (),
-            // Not supported. Will remove later.
-            _ => return Err(ProgramError::InvalidInstructionData),
-        }
         check_owned_and_writable(deque_account)?;
 
         let mint = match choice {

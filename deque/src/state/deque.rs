@@ -3,8 +3,11 @@ use solana_program::{msg, program_error::ProgramError, pubkey::Pubkey};
 use static_assertions::const_assert_eq;
 
 use crate::{
-    state::{DequeHeader, DequeType, MarketEscrow, Stack, StackNode, HEADER_FIXED_SIZE},
-    utils::{from_sector_idx, from_sector_idx_mut, from_slab_bytes_mut, SectorIndex, Slab, NIL},
+    state::{DequeHeader, MarketEscrow, Stack, StackNode, HEADER_FIXED_SIZE},
+    utils::{
+        from_sector_idx, from_sector_idx_mut, from_slab_bytes_mut, SectorIndex, Slab, NIL,
+        SECTOR_SIZE,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Zeroable)]
@@ -17,12 +20,9 @@ pub struct DequeNode<T> {
 }
 
 // Ensure that deque and stack nodes are the same size, regardless of type.
-const_assert_eq!(size_of::<DequeNode<u8>>(), size_of::<StackNode<u8>>());
-const_assert_eq!(size_of::<DequeNode<u32>>(), size_of::<StackNode<u32>>());
-const_assert_eq!(size_of::<DequeNode<u64>>(), size_of::<StackNode<u64>>());
 const_assert_eq!(
-    size_of::<DequeNode<[u8; 7]>>(),
-    size_of::<StackNode<[u8; 7]>>()
+    size_of::<DequeNode<MarketEscrow>>(),
+    size_of::<StackNode<MarketEscrow>>()
 );
 
 unsafe impl<T: Pod> Pod for DequeNode<T> {}
@@ -41,7 +41,6 @@ impl<'a> Deque<'a> {
     /// of sectors.
     pub fn init_deque_account(
         data: &mut [u8],
-        deque_type: DequeType,
         num_sectors: u16,
         deque_bump: u8,
         base_mint: &Pubkey,
@@ -53,24 +52,16 @@ impl<'a> Deque<'a> {
 
         let mut deque = Deque::new_from_bytes(data)?;
         // Write a new empty header to the `deque.header`
-        *deque.header = DequeHeader::new_empty(deque_type, deque_bump, base_mint, quote_mint);
+        *deque.header = DequeHeader::new_empty(deque_bump, base_mint, quote_mint);
 
-        let sector_size = deque_type.sector_size();
-        debug_assert_eq!(deque.sectors.len() % sector_size, 0);
-        debug_assert_eq!(deque.sectors.len(), (num_sectors as usize) * sector_size);
+        debug_assert_eq!(deque.sectors.len() % SECTOR_SIZE, 0);
+        debug_assert_eq!(deque.sectors.len(), (num_sectors as usize) * SECTOR_SIZE);
 
-        let space_needed = (num_sectors as usize)
-            .checked_mul(sector_size)
-            .ok_or(ProgramError::InvalidAccountData)?;
-        if deque.sectors.len() < space_needed {
+        if deque.sectors.len() < (HEADER_FIXED_SIZE + SECTOR_SIZE) {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        match deque_type {
-            DequeType::U32 => deque.init_free_stack::<u32>(num_sectors as usize)?,
-            DequeType::U64 => deque.init_free_stack::<u64>(num_sectors as usize)?,
-            DequeType::Market => deque.init_free_stack::<MarketEscrow>(num_sectors as usize)?,
-        }
+        deque.init_free_stack::<MarketEscrow>(num_sectors as usize)?;
 
         Ok(())
     }
