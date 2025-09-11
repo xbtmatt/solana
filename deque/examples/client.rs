@@ -167,6 +167,45 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
 
     inspect_account(rpc, &deque_pubkey, false);
 
+    // ----------------------------------------- Withdraw -------------------------------------------
+    println!(
+        "Payer balance before: {:?}\nVault balance before: {:?}",
+        get_token_balance(rpc, &payer.pubkey(), &base_mint),
+        get_token_balance(rpc, &vault_pubkey, &base_mint)
+    );
+
+    let withdraw_ixn = Instruction::new_with_borsh(
+        program_id,
+        &DequeInstruction::Withdraw {
+            choice: MarketEscrowChoice::Base,
+        },
+        vec![
+            AccountMeta::new(deque_pubkey, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new(vault_pubkey, false),
+            AccountMeta::new(payer_ata, false),
+            AccountMeta::new_readonly(spl_token::id(), false),
+            AccountMeta::new_readonly(base_mint, false),
+            AccountMeta::new(vault_base_ata, false),
+        ],
+    );
+
+    send_txn(
+        rpc,
+        payer,
+        &[payer],
+        vec![withdraw_ixn],
+        "withdraw".to_string(),
+    );
+
+    println!(
+        "Payer balance after: {:?}\nVault balance after: {:?}",
+        get_token_balance(rpc, &payer.pubkey(), &base_mint),
+        get_token_balance(rpc, &vault_pubkey, &base_mint)
+    );
+
+    inspect_account(rpc, &deque_pubkey, false);
+
     print_size_and_sectors(rpc, &deque_pubkey);
 }
 
@@ -223,7 +262,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
             match deque.header.get_type() {
                 DequeType::U32 => {
                     let from_head = deque
-                        .iter_indices_from_head::<u32>()
+                        .iter_indices::<u32>()
                         .map(|it| {
                             *from_sector_idx::<DequeNode<u32>>(deque.sectors, it)
                                 .expect("Should be valid.")
@@ -236,7 +275,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                 }
                 DequeType::U64 => {
                     let from_head = deque
-                        .iter_indices_from_head::<u64>()
+                        .iter_indices::<u64>()
                         .map(|it| {
                             *from_sector_idx::<DequeNode<u64>>(deque.sectors, it)
                                 .expect("Should be valid.")
@@ -249,7 +288,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                 }
                 DequeType::Market => {
                     let from_head = deque
-                        .iter_indices_from_head::<MarketEscrow>()
+                        .iter_indices::<MarketEscrow>()
                         .map(|it| {
                             *from_sector_idx::<DequeNode<MarketEscrow>>(deque.sectors, it)
                                 .expect("Should be valid.")

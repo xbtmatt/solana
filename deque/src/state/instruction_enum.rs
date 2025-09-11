@@ -31,7 +31,6 @@ pub enum DequeInstruction {
         choice: MarketEscrowChoice,
     },
     Withdraw {
-        amount: u64,
         choice: MarketEscrowChoice,
     },
 }

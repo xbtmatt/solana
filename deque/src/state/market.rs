@@ -1,14 +1,14 @@
 use bytemuck::{Pod, Zeroable};
 use solana_program::pubkey::Pubkey;
 
-use crate::PROGRAM_ID_PUBKEY;
+use crate::{state::MarketEscrowChoice, PROGRAM_ID_PUBKEY};
 
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 #[repr(C)]
 pub struct MarketEscrow {
-    trader: Pubkey,
-    base: u64,
-    quote: u64,
+    pub trader: Pubkey,
+    pub base: u64,
+    pub quote: u64,
 }
 
 impl MarketEscrow {
@@ -17,6 +17,13 @@ impl MarketEscrow {
             trader,
             base,
             quote,
+        }
+    }
+
+    pub fn amount_from_choice(&self, choice: MarketEscrowChoice) -> u64 {
+        match choice {
+            MarketEscrowChoice::Base => self.base,
+            MarketEscrowChoice::Quote => self.quote,
         }
     }
 }
@@ -42,9 +49,9 @@ macro_rules! deque_seeds_with_bump {
 
 #[macro_export]
 macro_rules! vault_seeds {
-    ( $vault:expr, $base_mint:expr, $quote_mint:expr ) => {
+    ( $deque:expr, $base_mint:expr, $quote_mint:expr ) => {
         &[
-            $vault.as_ref(),
+            $deque.as_ref(),
             $base_mint.as_ref(),
             $quote_mint.as_ref(),
             b"vault",

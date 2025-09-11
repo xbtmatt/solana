@@ -4,7 +4,10 @@ use static_assertions::const_assert_eq;
 
 use crate::{
     state::{DequeHeader, DequeType, MarketEscrow, Stack, StackNode, HEADER_FIXED_SIZE},
-    utils::{from_sector_idx, from_sector_idx_mut, from_slab_bytes_mut, SectorIndex, Slab, NIL},
+    utils::{
+        from_sector_idx, from_sector_idx_mut, from_slab_bytes, from_slab_bytes_mut, SectorIndex,
+        Slab, NIL,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Zeroable)]
@@ -182,10 +185,9 @@ impl<'a> Deque<'a> {
 
         // Pick the closer direction, grab the sector index
         let idx = if pos <= len / 2 {
-            self.iter_indices_from_head::<P>().nth(pos as usize)
+            self.iter_indices::<P>().nth(pos as usize)
         } else {
-            self.iter_indices_from_tail::<P>()
-                .nth((len - 1 - pos) as usize)
+            self.iter_indices_rev::<P>().nth((len - 1 - pos) as usize)
         }
         .ok_or(ProgramError::InvalidAccountData)?;
 
@@ -224,9 +226,17 @@ impl<'a> Deque<'a> {
         Ok(inner)
     }
 
+    pub fn iter_nodes<T: Pod>(&self) -> impl Iterator<Item = (&T, SectorIndex)> + '_ {
+        self.iter_indices::<T>().filter_map(move |i| {
+            from_sector_idx::<DequeNode<T>>(self.sectors, i)
+                .ok()
+                .map(|node| (&node.inner, i))
+        })
+    }
+
     // TODO: Fix generics for this later. It allows incorrect passing of Slabs. Currently
     // needs to be pod- tried a trait impl for next/prev/inner but it got too complex for POC.
-    pub fn iter_indices_from_head<T: Pod>(&self) -> impl Iterator<Item = SectorIndex> + '_ {
+    pub fn iter_indices<T: Pod>(&self) -> impl Iterator<Item = SectorIndex> + '_ {
         let start = (self.header.deque_head != NIL).then_some(self.header.deque_head);
         std::iter::successors(start, move |&i| {
             let maybe_node = from_sector_idx::<DequeNode<T>>(self.sectors, i).ok();
@@ -238,7 +248,7 @@ impl<'a> Deque<'a> {
 
     // TODO: Fix generics for this later. It allows incorrect passing of Slabs. Currently
     // needs to be pod- tried a trait impl for next/prev/inner but it got too complex for POC.
-    pub fn iter_indices_from_tail<T: Pod>(&self) -> impl Iterator<Item = SectorIndex> + '_ {
+    pub fn iter_indices_rev<T: Pod>(&self) -> impl Iterator<Item = SectorIndex> + '_ {
         let start = (self.header.deque_tail != NIL).then_some(self.header.deque_tail);
         std::iter::successors(start, move |&i| {
             let maybe_node = from_sector_idx::<DequeNode<T>>(self.sectors, i).ok();

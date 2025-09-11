@@ -31,8 +31,8 @@ pub fn process_instruction(
         DequeInstruction::Deposit { amount, choice } => {
             instructions::deposit::process(program_id, accounts, amount, choice)
         }
-        DequeInstruction::Withdraw { amount, choice } => {
-            instructions::withdraw::process(program_id, accounts, amount, choice)
+        DequeInstruction::Withdraw { choice } => {
+            instructions::withdraw::process(program_id, accounts, choice)
         }
     }
 }

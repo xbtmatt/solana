@@ -4,6 +4,7 @@ use solana_program::{declare_id, entrypoint, pubkey::Pubkey};
 
 use processor::process_instruction;
 
+pub mod context;
 pub mod instructions;
 pub mod processor;
 pub mod state;
