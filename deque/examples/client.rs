@@ -1,7 +1,7 @@
 use deque::{
     state::{
         get_deque_address, get_vault_address, Deque, DequeInstruction, DequeNode, DequeType,
-        HEADER_FIXED_SIZE,
+        MarketEscrow, MarketEscrowChoice, HEADER_FIXED_SIZE,
     },
     utils::from_sector_idx,
     PROGRAM_ID_PUBKEY,
@@ -18,6 +18,7 @@ use solana_sdk::{
     system_program,
     transaction::Transaction,
 };
+use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Mint;
 
 #[tokio::main]
@@ -49,8 +50,8 @@ async fn main() {
     }
     println!("Airdrop confirmed\n");
 
-    println!("=== Testing Deque<u64, 5> ===");
-    test_u64_deque(&client, &payer, program_id);
+    // println!("=== Testing Deque<u64, 5> ===");
+    // test_u64_deque(&client, &payer, program_id);
 
     println!("=== Testing market escrow ===");
     test_market_escrow(&client, &payer, program_id);
@@ -83,31 +84,19 @@ fn create_token(
     )
     .or(Err(()))?;
 
-    let token_acc = Keypair::new();
-    let acc_space = spl_token::state::Account::LEN;
-    let acc_rent = rpc
-        .get_minimum_balance_for_rent_exemption(acc_space)
-        .or(Err(()))?;
-    let create_acc = system_instruction::create_account(
-        &payer.pubkey(),
-        &token_acc.pubkey(),
-        acc_rent,
-        acc_space as u64,
-        &spl_token::id(),
-    );
-
-    let init_acc = spl_token::instruction::initialize_account3(
-        &spl_token::id(),
-        &token_acc.pubkey(),
-        &mint.pubkey(),
-        &payer.pubkey(),
-    )
-    .or(Err(()))?;
+    let payer_ata = get_associated_token_address(&payer.pubkey(), &mint.pubkey());
+    let create_ata =
+        spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+            &payer.pubkey(),
+            &payer.pubkey(),
+            &mint.pubkey(),
+            &spl_token::id(),
+        );
 
     let mint_to = spl_token::instruction::mint_to_checked(
         &spl_token::id(),
         &mint.pubkey(),
-        &token_acc.pubkey(),
+        &payer_ata,
         &payer.pubkey(),
         &[],
         mint_amt,
@@ -120,23 +109,23 @@ fn create_token(
         payer,
         &[&mint],
         vec![create_mint, init_mint],
-        "mint one".to_string(),
+        "--- create and initialize mint ---".to_string(),
     );
     send_txn(
         rpc,
         payer,
-        &[&token_acc],
-        vec![create_acc, init_acc, mint_to],
-        "mint two".to_string(),
+        &[payer],
+        vec![create_ata, mint_to],
+        "--- create ATA and mint to it".to_string(),
     );
 
-    Ok((mint.pubkey(), token_acc.pubkey()))
+    Ok((mint.pubkey(), payer_ata))
 }
 
 fn test_u64_deque(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     // ------------------------------------ Mint two tokens ----------------------------------------
-    let (base_mint, _base_token_acc) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
-    let (quote_mint, _quote_token_acc) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
+    let (base_mint, _base_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
+    let (quote_mint, _quote_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
     let (deque_pubkey, _deque_bump) = get_deque_address(&base_mint, &quote_mint);
     let (vault_pubkey, _vault_bump) = get_vault_address(&deque_pubkey, &base_mint, &quote_mint);
 
@@ -150,8 +139,6 @@ fn test_u64_deque(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     let init_data = borsh::to_vec(&DequeInstruction::Initialize {
         deque_type: DequeType::U64.into(),
         num_sectors: 5,
-        base_mint,
-        quote_mint,
     })
     .expect("Failed to serialize");
 
@@ -266,24 +253,27 @@ fn test_u64_deque(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
 
 fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     // ------------------------------------ Mint two tokens ----------------------------------------
-    let (base_mint, _base_token_acc) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
-    let (quote_mint, _quote_token_acc) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
+    let (base_mint, _payer_base_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
+    let (quote_mint, _payer_quote_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
     let (deque_pubkey, _deque_bump) = get_deque_address(&base_mint, &quote_mint);
     let (vault_pubkey, _vault_bump) = get_vault_address(&deque_pubkey, &base_mint, &quote_mint);
 
     println!("deque pubkey {:#?}", deque_pubkey.to_string());
     println!("vault pubkey {:#?}", vault_pubkey.to_string());
     println!("base mint pubkey {:#?}", base_mint.to_string());
-    println!("quote mint  pubkey {:#?}", quote_mint.to_string());
+    println!("quote mint pubkey {:#?}", quote_mint.to_string());
 
     // ------------------------------------- Initialization ----------------------------------------
     let init_data = borsh::to_vec(&DequeInstruction::Initialize {
         deque_type: DequeType::Market.into(),
         num_sectors: 10,
-        base_mint,
-        quote_mint,
     })
     .expect("Failed to serialize");
+
+    let (vault_base_ata, vault_quote_ata) = (
+        get_associated_token_address(&vault_pubkey, &base_mint),
+        get_associated_token_address(&vault_pubkey, &quote_mint),
+    );
 
     let init_instruction = Instruction::new_with_bytes(
         program_id,
@@ -294,6 +284,12 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
             AccountMeta::new_readonly(system_program::id(), false),
             AccountMeta::new(vault_pubkey, false),
             AccountMeta::new_readonly(spl_token::id(), false),
+            // For the ATA creation inside the program.
+            AccountMeta::new(vault_base_ata, false),
+            AccountMeta::new(vault_quote_ata, false),
+            AccountMeta::new_readonly(base_mint, false),
+            AccountMeta::new_readonly(quote_mint, false),
+            AccountMeta::new_readonly(spl_associated_token_account::id(), false),
         ],
     );
 
@@ -305,93 +301,76 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
         "initialize Market Deque".to_string(),
     );
 
-    // ---------------------------------------- Mutations ------------------------------------------
-    for value in [7u64, 8u64] {
-        println!("\nPushing {} to front.", value);
-        let push_data = DequeInstruction::PushFront {
-            value: value.to_le_bytes().to_vec(),
-        };
-        send_instruction(
-            rpc,
-            payer,
-            deque_pubkey,
-            program_id,
-            push_data,
-            "push_front",
+    let create_ata_ixn =
+        spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+            &payer.pubkey(),
+            &payer.pubkey(),
+            &base_mint,
+            &spl_token::id(),
         );
-    }
 
-    // Push some values to the back
-    for value in [3u64, 4u64] {
-        println!("\nPushing {} to back.", value);
-        let push_data = DequeInstruction::PushBack {
-            value: value.to_le_bytes().to_vec(),
-        };
-        send_instruction(rpc, payer, deque_pubkey, program_id, push_data, "push_back");
-    }
+    send_txn(
+        rpc,
+        payer,
+        &[payer],
+        vec![create_ata_ixn],
+        "create associated token account".to_string(),
+    );
 
-    // Remove an element
-    println!("\nRemoving element at index 1");
-    let remove_data = DequeInstruction::Remove { index: 1 };
-    send_instruction(rpc, payer, deque_pubkey, program_id, remove_data, "remove");
+    let payer_ata = get_associated_token_address(&payer.pubkey(), &base_mint);
+    println!("vault_pubkey {:#?}", vault_pubkey.to_string());
+    println!("payer_ata {:#?}", payer_ata.to_string());
 
-    // Try to push one more (should have room now)
-    println!("\nPushing 777 to back");
-    let push_data = DequeInstruction::PushBack {
-        value: 777u64.to_le_bytes().to_vec(),
-    };
-    send_instruction(rpc, payer, deque_pubkey, program_id, push_data, "push_back");
+    // ----------------------------------------- Deposit -------------------------------------------
 
-    print_size_and_sectors(rpc, &deque_pubkey);
+    println!(
+        "Payer balance before: {:?}",
+        get_token_balance(rpc, &payer.pubkey(), &base_mint)
+    );
 
-    // ----------------------------------------- Resize --------------------------------------------
-    println!("Resizing Deque<u64>...");
-    let additional_sectors = 7;
-    let resize_data: Vec<u8> = borsh::to_vec(&DequeInstruction::Resize {
-        num_sectors: additional_sectors,
-    })
-    .expect("Failed to serialize.");
+    println!(
+        "Vault balance before: {:?}",
+        get_token_balance(rpc, &vault_pubkey, &base_mint)
+    );
 
-    let resize_ixn = Instruction::new_with_bytes(
+    let deposit_ixn = Instruction::new_with_borsh(
         program_id,
-        &resize_data,
+        &DequeInstruction::Deposit {
+            amount: 1000,
+            choice: MarketEscrowChoice::Base,
+        },
         vec![
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program::id(), false),
+            AccountMeta::new(vault_pubkey, false),
+            AccountMeta::new(payer_ata, false),
+            AccountMeta::new_readonly(spl_token::id(), false),
+            AccountMeta::new_readonly(base_mint, false),
+            AccountMeta::new(vault_base_ata, false),
         ],
     );
 
-    let mut transaction = Transaction::new_with_payer(&[resize_ixn], Some(&payer.pubkey()));
-    let blockhash = rpc.get_latest_blockhash().expect("Failed to get blockhash");
-    transaction.sign(&[payer], blockhash);
+    send_txn(
+        rpc,
+        payer,
+        &[payer],
+        vec![deposit_ixn],
+        "deposit".to_string(),
+    );
 
-    match rpc.send_and_confirm_transaction(&transaction) {
-        Ok(sig) => println!("✓ Resized: {}", sig),
-        Err(e) => {
-            eprintln!("Failed to resize: {}", e);
-            return;
-        }
-    }
+    println!(
+        "Payer balance after: {:?}",
+        get_token_balance(rpc, &payer.pubkey(), &base_mint)
+    );
 
-    // ---------------------------------------- Push more ------------------------------------------
-    let start = 71u64;
-    let end = start + additional_sectors as u64;
-    for i in start..=end {
-        send_instruction(
-            rpc,
-            payer,
-            deque_pubkey,
-            program_id,
-            DequeInstruction::PushFront {
-                value: i.to_le_bytes().to_vec(),
-            },
-            "push front",
-        );
-    }
+    println!(
+        "Vault balance after: {:?}",
+        get_token_balance(rpc, &vault_pubkey, &base_mint)
+    );
+
+    inspect_account(rpc, &deque_pubkey, false);
 
     print_size_and_sectors(rpc, &deque_pubkey);
-    inspect_account(rpc, &deque_pubkey, false);
 }
 
 fn print_size_and_sectors(client: &RpcClient, account_pubkey: &Pubkey) {
@@ -453,7 +432,6 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                                 .expect("Should be valid.")
                         })
                         .collect::<Vec<DequeNode<u32>>>();
-                    // let free_head = from_sector::<DequeNode<u32>>(sectors, header.free_head);
                     println!(
                         "{:?}",
                         from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
@@ -467,14 +445,23 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
                                 .expect("Should be valid.")
                         })
                         .collect::<Vec<DequeNode<u64>>>();
-                    // let free_head = from_sector::<DequeNode<u64>>(sectors, header.free_head);
                     println!(
                         "{:?}",
                         from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
                     );
                 }
                 DequeType::Market => {
-                    todo!();
+                    let from_head = deque
+                        .iter_indices_from_head::<u64>()
+                        .map(|it| {
+                            *from_sector_idx::<DequeNode<MarketEscrow>>(deque.sectors, it)
+                                .expect("Should be valid.")
+                        })
+                        .collect::<Vec<DequeNode<MarketEscrow>>>();
+                    println!(
+                        "{:?}",
+                        from_head.iter().map(|f| f.inner).collect::<Vec<_>>()
+                    );
                 }
             }
         }
@@ -547,4 +534,16 @@ pub fn send_txn(
             panic!();
         }
     };
+}
+
+pub fn get_token_balance(rpc: &RpcClient, owner: &Pubkey, mint: &Pubkey) -> u64 {
+    let ata = get_associated_token_address(owner, mint);
+    let acc_data = rpc
+        .get_account(&ata)
+        .expect("Should be able to get account")
+        .data;
+    let token_account =
+        spl_token::state::Account::unpack(&acc_data).expect("Should have account data.");
+
+    token_account.amount
 }

@@ -3,12 +3,22 @@ use solana_program::pubkey::Pubkey;
 
 use crate::PROGRAM_ID_PUBKEY;
 
-#[derive(Clone, Copy, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
 #[repr(C)]
 pub struct MarketEscrow {
     trader: Pubkey,
     base: u64,
     quote: u64,
+}
+
+impl MarketEscrow {
+    pub fn new(trader: Pubkey, base: u64, quote: u64) -> Self {
+        MarketEscrow {
+            trader,
+            base,
+            quote,
+        }
+    }
 }
 
 #[macro_export]

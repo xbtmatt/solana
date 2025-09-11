@@ -1,15 +1,18 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use solana_program::pubkey::Pubkey;
 
 use crate::utils::SectorIndex;
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum MarketEscrowChoice {
+    Base,
+    Quote,
+}
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub enum DequeInstruction {
     Initialize {
         deque_type: u8,
         num_sectors: u16,
-        base_mint: Pubkey,
-        quote_mint: Pubkey,
     },
     PushFront {
         value: Vec<u8>,
@@ -25,8 +28,10 @@ pub enum DequeInstruction {
     },
     Deposit {
         amount: u64,
+        choice: MarketEscrowChoice,
     },
     Withdraw {
         amount: u64,
+        choice: MarketEscrowChoice,
     },
 }

@@ -15,16 +15,7 @@ pub fn process_instruction(
         DequeInstruction::Initialize {
             deque_type,
             num_sectors,
-            base_mint,
-            quote_mint,
-        } => instructions::initialize::process(
-            program_id,
-            accounts,
-            deque_type,
-            num_sectors,
-            &base_mint,
-            &quote_mint,
-        ),
+        } => instructions::initialize::process(program_id, accounts, deque_type, num_sectors),
         DequeInstruction::PushFront { value } => {
             instructions::push_front::process(program_id, accounts, value)
         }
@@ -37,11 +28,11 @@ pub fn process_instruction(
         DequeInstruction::Resize { num_sectors } => {
             instructions::resize::process(program_id, accounts, num_sectors)
         }
-        DequeInstruction::Deposit { amount } => {
-            instructions::deposit::process(program_id, accounts, amount)
+        DequeInstruction::Deposit { amount, choice } => {
+            instructions::deposit::process(program_id, accounts, amount, choice)
         }
-        DequeInstruction::Withdraw { amount } => {
-            instructions::withdraw::process(program_id, accounts, amount)
+        DequeInstruction::Withdraw { amount, choice } => {
+            instructions::withdraw::process(program_id, accounts, amount, choice)
         }
     }
 }
