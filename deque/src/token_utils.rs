@@ -1,6 +1,5 @@
 use solana_program::{
     account_info::AccountInfo,
-    msg,
     program::{invoke, invoke_signed},
     program_error::ProgramError,
     program_pack::Pack,
@@ -10,7 +9,7 @@ use solana_program::{
     sysvar::Sysvar,
 };
 
-use crate::{utils::log_bytes, vault_seeds_with_bump};
+use crate::vault_seeds_with_bump;
 
 pub fn create_token_vault<'a, 'info>(
     payer: &'a AccountInfo<'info>,
@@ -83,22 +82,6 @@ impl<'a, 'info> TokenAccountInfo<'a, 'info> {
         owner: &Pubkey,
     ) -> Result<TokenAccountInfo<'a, 'info>, ProgramError> {
         // TODO: Add spl_token_2022 support here.
-        if info.owner != &spl_token::id() {
-            msg!("1");
-            log_bytes(info.owner.as_ref());
-            log_bytes(spl_token::id().as_array());
-        }
-        if &info.try_borrow_data()?[0..32] != mint.as_ref() {
-            msg!("2");
-            log_bytes(&info.try_borrow_data()?[0..32]);
-            log_bytes(mint.as_ref());
-        }
-        if &info.try_borrow_data()?[32..64] != owner.as_ref() {
-            msg!("3");
-            log_bytes(&info.try_borrow_data()?[32..64]);
-            log_bytes(owner.as_ref());
-        }
-
         // The account owner should be a token program.
         if info.owner != &spl_token::id() ||
             // Mint pubkeys are at the 0 byte offset of the token account data. Verify it matches.
