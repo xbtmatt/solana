@@ -8,6 +8,7 @@ pub mod instructions;
 pub mod processor;
 pub mod state;
 pub mod tests;
+pub mod token_utils;
 pub mod utils;
 
 pub const PROGRAM_ID_STR: &str = "9SM4HUDDWsKDs9wCkfdGwkfDtUL9WwXUnmqdwNnZTzBW";

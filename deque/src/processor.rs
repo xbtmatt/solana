@@ -15,7 +15,16 @@ pub fn process_instruction(
         DequeInstruction::Initialize {
             deque_type,
             num_sectors,
-        } => instructions::create::process(program_id, accounts, deque_type, num_sectors),
+            base_mint,
+            quote_mint,
+        } => instructions::initialize::process(
+            program_id,
+            accounts,
+            deque_type,
+            num_sectors,
+            &base_mint,
+            &quote_mint,
+        ),
         DequeInstruction::PushFront { value } => {
             instructions::push_front::process(program_id, accounts, value)
         }

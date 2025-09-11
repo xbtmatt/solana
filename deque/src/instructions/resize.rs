@@ -2,7 +2,7 @@ use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
     msg,
-    program::invoke,
+    program::invoke_signed,
     program_error::ProgramError,
     pubkey::Pubkey,
     rent::Rent,
@@ -11,6 +11,7 @@ use solana_program::{
 };
 
 use crate::{
+    deque_seeds_with_bump,
     state::{Deque, DequeType, Stack, HEADER_FIXED_SIZE},
     utils::{check_owned_and_writable, SectorIndex},
 };
@@ -36,6 +37,12 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
     let deque_type = deque.header.get_type();
     let sector_size = deque_type.sector_size();
 
+    let (base_mint, quote_mint, deque_bump) = (
+        deque.header.base_mint,
+        deque.header.quote_mint,
+        deque.header.deque_bump,
+    );
+
     drop(deque_data);
 
     let additional_space = sector_size * (num_sectors as usize);
@@ -46,13 +53,14 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
     let lamports_diff = new_lamports_required.saturating_sub(current_lamports);
 
     if lamports_diff > 0 {
-        invoke(
+        invoke_signed(
             &system_instruction::transfer(payer_account.key, deque_account.key, lamports_diff),
             &[
                 payer_account.clone(),
                 deque_account.clone(),
                 system_program.clone(),
             ],
+            deque_seeds_with_bump!(base_mint, quote_mint, deque_bump),
         )?;
     }
 

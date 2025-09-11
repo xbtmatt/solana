@@ -1,17 +1,24 @@
 use deque::{
-    state::{Deque, DequeInstruction, DequeNode, DequeType, HEADER_FIXED_SIZE},
+    state::{
+        get_deque_address, get_vault_address, Deque, DequeInstruction, DequeNode, DequeType,
+        HEADER_FIXED_SIZE,
+    },
     utils::from_sector_idx,
     PROGRAM_ID_PUBKEY,
 };
 use solana_client::rpc_client::RpcClient;
+use solana_program::example_mocks::solana_sdk::system_instruction;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
     instruction::{AccountMeta, Instruction},
+    message::Message,
+    program_pack::Pack,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     system_program,
     transaction::Transaction,
 };
+use spl_token::state::Mint;
 
 #[tokio::main]
 async fn main() {
@@ -44,28 +51,105 @@ async fn main() {
 
     // Test Deque with 5 u64s
     println!("=== Testing Deque<u64, 5> ===");
-    let deque_u64 = Keypair::new();
-    println!("{:#?}", deque_u64.pubkey().to_string());
-    test_u64_deque(&client, &payer, &deque_u64, program_id);
-    inspect_account(&client, &deque_u64.pubkey(), false);
-
-    println!("\n=== Testing Deque<u32, 10> ===");
-    let deque_u32 = Keypair::new();
-    test_u32_deque(&client, &payer, &deque_u32, program_id);
-    inspect_account(&client, &deque_u32.pubkey(), false);
+    test_u64_deque(&client, &payer, program_id);
 }
 
-fn test_u64_deque(
-    client: &RpcClient,
+/// Returns the mint pubkey and the token account pubkey.
+fn create_token(
+    rpc: &RpcClient,
     payer: &Keypair,
-    deque_account: &Keypair,
-    program_id: Pubkey,
-) {
+    mint_decimals: u8,
+    mint_amt: u64,
+) -> Result<(Pubkey, Pubkey), ()> {
+    let mint = Keypair::new();
+    let mint_rent = rpc
+        .get_minimum_balance_for_rent_exemption(Mint::LEN)
+        .or(Err(()))?;
+    let create_mint = system_instruction::create_account(
+        &payer.pubkey(),
+        &mint.pubkey(),
+        mint_rent,
+        Mint::LEN as u64,
+        &spl_token::id(),
+    );
+    let init_mint = spl_token::instruction::initialize_mint2(
+        &spl_token::id(),
+        &mint.pubkey(),
+        &payer.pubkey(),
+        None,
+        mint_decimals,
+    )
+    .or(Err(()))?;
+
+    let token_acc = Keypair::new();
+    let acc_space = spl_token::state::Account::LEN;
+    let acc_rent = rpc
+        .get_minimum_balance_for_rent_exemption(acc_space)
+        .or(Err(()))?;
+    let create_acc = system_instruction::create_account(
+        &payer.pubkey(),
+        &token_acc.pubkey(),
+        acc_rent,
+        acc_space as u64,
+        &spl_token::id(),
+    );
+
+    let init_acc = spl_token::instruction::initialize_account3(
+        &spl_token::id(),
+        &token_acc.pubkey(),
+        &mint.pubkey(),
+        &payer.pubkey(),
+    )
+    .or(Err(()))?;
+
+    let mint_to = spl_token::instruction::mint_to_checked(
+        &spl_token::id(),
+        &mint.pubkey(),
+        &token_acc.pubkey(),
+        &payer.pubkey(),
+        &[],
+        mint_amt,
+        mint_decimals,
+    )
+    .or(Err(()))?;
+
+    send_txn(
+        rpc,
+        payer,
+        &[&mint],
+        vec![create_mint, init_mint],
+        "mint one".to_string(),
+    );
+    send_txn(
+        rpc,
+        payer,
+        &[&token_acc],
+        vec![create_acc, init_acc, mint_to],
+        "mint two".to_string(),
+    );
+
+    Ok((mint.pubkey(), token_acc.pubkey()))
+}
+
+fn test_u64_deque(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
+    // ------------------------------------ Mint two tokens ----------------------------------------
+    let (base_mint, _base_token_acc) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
+    let (quote_mint, _quote_token_acc) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
+    let (deque_pubkey, _deque_bump) = get_deque_address(&base_mint, &quote_mint);
+    let (vault_pubkey, _vault_bump) = get_vault_address(&deque_pubkey, &base_mint, &quote_mint);
+
+    println!("deque pubkey {:#?}", deque_pubkey.to_string());
+    println!("vault pubkey {:#?}", vault_pubkey.to_string());
+    println!("base mint pubkey {:#?}", base_mint.to_string());
+    println!("quote mint  pubkey {:#?}", quote_mint.to_string());
+
     // ------------------------------------- Initialization ----------------------------------------
     println!("Initializing Deque<u64>...");
     let init_data = borsh::to_vec(&DequeInstruction::Initialize {
         deque_type: DequeType::U64.into(),
         num_sectors: 5,
+        base_mint,
+        quote_mint,
     })
     .expect("Failed to serialize");
 
@@ -73,19 +157,19 @@ fn test_u64_deque(
         program_id,
         &init_data,
         vec![
-            AccountMeta::new(deque_account.pubkey(), true),
+            AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program::id(), false),
+            AccountMeta::new(vault_pubkey, false),
+            AccountMeta::new_readonly(spl_token::id(), false),
         ],
     );
 
     let mut transaction = Transaction::new_with_payer(&[init_instruction], Some(&payer.pubkey()));
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get blockhash");
-    transaction.sign(&[payer, deque_account], blockhash);
+    let blockhash = rpc.get_latest_blockhash().expect("Failed to get blockhash");
+    transaction.sign(&[payer], blockhash);
 
-    match client.send_and_confirm_transaction(&transaction) {
+    match rpc.send_and_confirm_transaction(&transaction) {
         Ok(sig) => println!("✓ Initialized: {}", sig),
         Err(e) => {
             eprintln!("Failed to initialize: {}", e);
@@ -100,9 +184,9 @@ fn test_u64_deque(
             value: value.to_le_bytes().to_vec(),
         };
         send_instruction(
-            client,
+            rpc,
             payer,
-            deque_account.pubkey(),
+            deque_pubkey,
             program_id,
             push_data,
             "push_front",
@@ -115,43 +199,22 @@ fn test_u64_deque(
         let push_data = DequeInstruction::PushBack {
             value: value.to_le_bytes().to_vec(),
         };
-        send_instruction(
-            client,
-            payer,
-            deque_account.pubkey(),
-            program_id,
-            push_data,
-            "push_back",
-        );
+        send_instruction(rpc, payer, deque_pubkey, program_id, push_data, "push_back");
     }
 
     // Remove an element
     println!("\nRemoving element at index 1");
     let remove_data = DequeInstruction::Remove { index: 1 };
-    send_instruction(
-        client,
-        payer,
-        deque_account.pubkey(),
-        program_id,
-        remove_data,
-        "remove",
-    );
+    send_instruction(rpc, payer, deque_pubkey, program_id, remove_data, "remove");
 
     // Try to push one more (should have room now)
     println!("\nPushing 777 to back");
     let push_data = DequeInstruction::PushBack {
         value: 777u64.to_le_bytes().to_vec(),
     };
-    send_instruction(
-        client,
-        payer,
-        deque_account.pubkey(),
-        program_id,
-        push_data,
-        "push_back",
-    );
+    send_instruction(rpc, payer, deque_pubkey, program_id, push_data, "push_back");
 
-    print_size_and_sectors(client, deque_account);
+    print_size_and_sectors(rpc, &deque_pubkey);
 
     // ----------------------------------------- Resize --------------------------------------------
     println!("Resizing Deque<u64>...");
@@ -165,19 +228,17 @@ fn test_u64_deque(
         program_id,
         &resize_data,
         vec![
-            AccountMeta::new(deque_account.pubkey(), true),
+            AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new_readonly(system_program::id(), false),
         ],
     );
 
     let mut transaction = Transaction::new_with_payer(&[resize_ixn], Some(&payer.pubkey()));
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get blockhash");
-    transaction.sign(&[payer, deque_account], blockhash);
+    let blockhash = rpc.get_latest_blockhash().expect("Failed to get blockhash");
+    transaction.sign(&[payer], blockhash);
 
-    match client.send_and_confirm_transaction(&transaction) {
+    match rpc.send_and_confirm_transaction(&transaction) {
         Ok(sig) => println!("✓ Resized: {}", sig),
         Err(e) => {
             eprintln!("Failed to resize: {}", e);
@@ -190,9 +251,9 @@ fn test_u64_deque(
     let end = start + additional_sectors as u64;
     for i in start..=end {
         send_instruction(
-            client,
+            rpc,
             payer,
-            deque_account.pubkey(),
+            deque_pubkey,
             program_id,
             DequeInstruction::PushFront {
                 value: i.to_le_bytes().to_vec(),
@@ -201,170 +262,12 @@ fn test_u64_deque(
         );
     }
 
-    print_size_and_sectors(client, deque_account);
+    print_size_and_sectors(rpc, &deque_pubkey);
+    inspect_account(rpc, &deque_pubkey, false);
 }
 
-fn test_u32_deque(
-    client: &RpcClient,
-    payer: &Keypair,
-    deque_account: &Keypair,
-    program_id: Pubkey,
-) {
-    // ------------------------------------- Initialization ----------------------------------------
-    println!("Initializing Deque<u32>...");
-    let init_data = borsh::to_vec(&DequeInstruction::Initialize {
-        deque_type: DequeType::U32.into(),
-        num_sectors: 10,
-    })
-    .expect("Failed to serialize");
-
-    let init_instruction = Instruction::new_with_bytes(
-        program_id,
-        &init_data,
-        vec![
-            AccountMeta::new(deque_account.pubkey(), true),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program::id(), false),
-        ],
-    );
-
-    let mut transaction = Transaction::new_with_payer(&[init_instruction], Some(&payer.pubkey()));
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get blockhash");
-    transaction.sign(&[payer, deque_account], blockhash);
-
-    match client.send_and_confirm_transaction(&transaction) {
-        Ok(sig) => println!("✓ Initialized: {}", sig),
-        Err(e) => {
-            eprintln!("Failed to initialize: {}", e);
-            return;
-        }
-    }
-
-    // ---------------------------------------- Mutations ------------------------------------------
-    // Push values alternating front and back
-    println!("\nPushing values alternating front/back");
-    let values: Vec<(u32, bool)> = vec![
-        (5, true),   // front
-        (6, false),  // back
-        (7, true),   // front
-        (8, false),  // back
-        (9, true),   // front
-        (10, false), // back
-        (11, true),  // front
-    ];
-
-    for (value, is_front) in values {
-        let push_data = if is_front {
-            println!("  Push {} to front", value);
-            DequeInstruction::PushFront {
-                value: value.to_le_bytes().to_vec(),
-            }
-        } else {
-            println!("  Push {} to back", value);
-            DequeInstruction::PushBack {
-                value: value.to_le_bytes().to_vec(),
-            }
-        };
-        let op = if is_front { "push_front" } else { "push_back" };
-        send_instruction(
-            client,
-            payer,
-            deque_account.pubkey(),
-            program_id,
-            push_data,
-            op,
-        );
-    }
-
-    // Remove a couple elements
-    println!("\nRemoving elements at indices 2 and 4");
-    for index in [2, 4] {
-        let remove_data = DequeInstruction::Remove { index };
-        send_instruction(
-            client,
-            payer,
-            deque_account.pubkey(),
-            program_id,
-            remove_data,
-            "remove",
-        );
-    }
-
-    // Add a couple more
-    println!("\nPushing 10 and 11 to back");
-    for value in [10u32, 11u32] {
-        let push_data = DequeInstruction::PushBack {
-            value: value.to_le_bytes().to_vec(),
-        };
-        send_instruction(
-            client,
-            payer,
-            deque_account.pubkey(),
-            program_id,
-            push_data,
-            "push_back",
-        );
-    }
-
-    print_size_and_sectors(client, deque_account);
-
-    // ----------------------------------------- Resize --------------------------------------------
-    println!("Resizing Deque<u32>...");
-    let additional_sectors = 3;
-    let resize_data: Vec<u8> = borsh::to_vec(&DequeInstruction::Resize {
-        num_sectors: additional_sectors,
-    })
-    .expect("Failed to serialize.");
-
-    let resize_ixn = Instruction::new_with_bytes(
-        program_id,
-        &resize_data,
-        vec![
-            AccountMeta::new(deque_account.pubkey(), true),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new_readonly(system_program::id(), false),
-        ],
-    );
-
-    let mut transaction = Transaction::new_with_payer(&[resize_ixn], Some(&payer.pubkey()));
-    let blockhash = client
-        .get_latest_blockhash()
-        .expect("Failed to get blockhash");
-    transaction.sign(&[payer, deque_account], blockhash);
-
-    match client.send_and_confirm_transaction(&transaction) {
-        Ok(sig) => println!("✓ Resized: {}", sig),
-        Err(e) => {
-            eprintln!("Failed to resize: {}", e);
-            return;
-        }
-    }
-
-    print_size_and_sectors(client, deque_account);
-
-    // ---------------------------------------- Push more ------------------------------------------
-    let start = 31u32;
-    let end = start + additional_sectors as u32;
-    for i in start..=end {
-        send_instruction(
-            client,
-            payer,
-            deque_account.pubkey(),
-            program_id,
-            DequeInstruction::PushFront {
-                value: i.to_le_bytes().to_vec(),
-            },
-            "push front",
-        );
-    }
-
-    // --------------------------------------- Print size ------------------------------------------
-}
-
-fn print_size_and_sectors(client: &RpcClient, account: &Keypair) {
-    if let Ok(account) = client.get_account(&account.pubkey()) {
+fn print_size_and_sectors(client: &RpcClient, account_pubkey: &Pubkey) {
+    if let Ok(account) = client.get_account(account_pubkey) {
         let cloned_data = &mut account.data.clone();
         let deque =
             Deque::new_from_bytes(cloned_data).expect("Should be able to deserialize into Deque.");
@@ -453,6 +356,7 @@ fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: bool) {
     }
 }
 
+// Send custom smart contract ixn.
 fn send_instruction(
     client: &RpcClient,
     payer: &Keypair,
@@ -481,4 +385,38 @@ fn send_instruction(
     }
 
     inspect_account(client, &deque_account, false);
+}
+
+// Generic transaction.
+pub fn send_txn(
+    rpc: &RpcClient,
+    payer: &Keypair,
+    signers: &[&Keypair],
+    ix: Vec<Instruction>,
+    txn_label: String,
+) {
+    let bh = rpc
+        .get_latest_blockhash()
+        .or(Err(()))
+        .expect("Should be able to get blockhash.");
+    let msg = Message::new(&ix, Some(&payer.pubkey()));
+    let mut tx = Transaction::new_unsigned(msg);
+    tx.try_sign(
+        &[std::iter::once(payer)
+            .chain(signers.iter().cloned())
+            .collect::<Vec<_>>()]
+        .concat(),
+        bh,
+    )
+    .expect("Should sign");
+
+    match rpc.send_and_confirm_transaction(&tx) {
+        Ok(sig) => {
+            println!("✓: Called {}, {}", txn_label, sig);
+        }
+        Err(e) => {
+            eprintln!("Failed to call {}: {}", txn_label, e);
+            panic!();
+        }
+    };
 }

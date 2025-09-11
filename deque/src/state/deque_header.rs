@@ -7,7 +7,7 @@ use solana_program::{program_error::ProgramError, pubkey::Pubkey};
 use static_assertions::const_assert_eq;
 
 pub const DEQUE_ACCOUNT_DISCRIMINANT: u64 = 0xf00dbabe;
-pub const HEADER_FIXED_SIZE: usize = 96;
+pub const HEADER_FIXED_SIZE: usize = 128;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Zeroable)]
@@ -58,9 +58,12 @@ pub struct DequeHeader {
     pub free_head: SectorIndex,
     pub deque_head: SectorIndex,
     pub deque_tail: SectorIndex,
-    pub _padding2: [u8; 4],
+    pub _padding2: [u8; 2],
+    pub deque_bump: u8,
+    pub vault_bump: u8,
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
+    pub vault: Pubkey,
 }
 
 unsafe impl Pod for DequeHeader {}
@@ -68,7 +71,14 @@ unsafe impl Pod for DequeHeader {}
 impl Slab for DequeHeader {}
 
 impl DequeHeader {
-    pub fn new_empty(deque_type: DequeType) -> Self {
+    pub fn new_empty(
+        deque_type: DequeType,
+        vault: &Pubkey,
+        deque_bump: u8,
+        vault_bump: u8,
+        base_mint: &Pubkey,
+        quote_mint: &Pubkey,
+    ) -> Self {
         DequeHeader {
             discriminant: DEQUE_ACCOUNT_DISCRIMINANT,
             deque_type: deque_type.into(),
@@ -78,9 +88,12 @@ impl DequeHeader {
             free_head: NIL,
             deque_head: NIL,
             deque_tail: NIL,
-            _padding2: [0; 4],
-            base_mint: todo!(),
-            quote_mint: todo!(),
+            _padding2: [0; 2],
+            deque_bump,
+            vault_bump,
+            base_mint: *base_mint,
+            quote_mint: *quote_mint,
+            vault: *vault,
         }
     }
 
@@ -112,8 +125,11 @@ const_assert_eq!(
     4 + // free_head
     4 + // deque_head
     4 + // deque_tail
-    4 + // padding2
+    2 + // padding2
+    1 + // deque_bump
+    1 + // vault_bump
     32 + // base_mint
-    32 // quote_mint
+    32 + // quote_mint
+    32 // vault
 );
 const_assert_eq!(size_of::<DequeHeader>() % 8, 0);
