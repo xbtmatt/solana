@@ -54,7 +54,8 @@ pub fn process(
 
     // Now push a node indicating that this user has escrowed tokens.
     let mut data = deque_account.data.borrow_mut();
-    let mut deque = Deque::new_from_bytes(&mut data)?;
+    // The deque's account discriminant is checked in `load`.
+    let mut deque = Deque::new_from_bytes_unchecked(&mut data)?;
     let escrow = MarketEscrow::new(*payer.key, base_amt, quote_amt);
 
     deque

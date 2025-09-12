@@ -65,7 +65,7 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
 
     // Now chain the old sectors to the new sectors in the stack of free nodes.
     let mut deque_data = deque_account.data.borrow_mut();
-    let deque = Deque::new_from_bytes(&mut deque_data)?;
+    let deque = Deque::new_from_bytes_unchecked(&mut deque_data)?;
 
     let curr_n_sectors = (current_size - HEADER_FIXED_SIZE) / SECTOR_SIZE;
     let new_n_sectors = curr_n_sectors + num_sectors as usize;

@@ -50,7 +50,7 @@ impl<'a> Deque<'a> {
             return Err(ProgramError::InvalidAccountData);
         }
 
-        let mut deque = Deque::new_from_bytes(data)?;
+        let mut deque = Deque::new_from_bytes_unchecked(data)?;
         // Write a new empty header to the `deque.header`
         *deque.header = DequeHeader::new_empty(deque_bump, base_mint, quote_mint);
 
@@ -78,7 +78,14 @@ impl<'a> Deque<'a> {
         Ok(())
     }
 
-    /// Construct a Deque from an existing byte vector- assumed to be well-formed.
+    /// Construct a Deque from an existing byte vector without checking the header's discriminant.
+    pub fn new_from_bytes_unchecked(data: &'a mut [u8]) -> Result<Self, ProgramError> {
+        let (header_slab, sectors) = data.split_at_mut(HEADER_FIXED_SIZE);
+        let header = from_slab_bytes_mut::<DequeHeader>(header_slab, 0_usize)?;
+        Ok(Self { header, sectors })
+    }
+
+    /// Construct a Deque from an existing byte vector and check the header's discriminant.
     pub fn new_from_bytes(data: &'a mut [u8]) -> Result<Self, ProgramError> {
         let (header_slab, sectors) = data.split_at_mut(HEADER_FIXED_SIZE);
         let header = from_slab_bytes_mut::<DequeHeader>(header_slab, 0_usize)?;

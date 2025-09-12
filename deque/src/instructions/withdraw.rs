@@ -23,7 +23,8 @@ pub fn process(
     } = MarketChoiceContext::load(accounts, &choice)?;
 
     let mut data = deque_account.data.borrow_mut();
-    let deque = Deque::new_from_bytes(&mut data)?;
+    // Deque discriminant is checked in `load`.
+    let deque = Deque::new_from_bytes_unchecked(&mut data)?;
 
     // Try to find a node with the payer.
     let escrow_and_idx = deque
@@ -64,7 +65,8 @@ pub fn process(
             )?;
 
             let mut data = deque_account.data.borrow_mut();
-            let mut deque = Deque::new_from_bytes(&mut data)?;
+            // The deque's account discriminant is checked in `load`.
+            let mut deque = Deque::new_from_bytes_unchecked(&mut data)?;
 
             // And remove the node from the deque.
             deque
