@@ -16,6 +16,7 @@ pub struct MarketChoiceContext<'a, 'info> {
     pub payer_ata: &'a AccountInfo<'info>,
     pub token_program: &'a AccountInfo<'info>,
     pub vault_ata: &'a AccountInfo<'info>,
+    pub system_program: &'a AccountInfo<'info>,
 }
 
 impl<'a, 'info> MarketChoiceContext<'a, 'info> {
@@ -30,6 +31,7 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
         let token_program = next_account_info(accounts_iter)?;
         let mint_in = next_account_info(accounts_iter)?;
         let vault_ata = next_account_info(accounts_iter)?;
+        let system_program = next_account_info(accounts_iter)?;
 
         let mut data = deque_account.data.borrow_mut();
         let deque = Deque::new_from_bytes(&mut data)?;
@@ -56,6 +58,7 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
             payer_ata,
             token_program,
             vault_ata,
+            system_program,
         })
     }
 }

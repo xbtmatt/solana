@@ -20,6 +20,7 @@ pub fn process(
         payer_ata,
         token_program,
         vault_ata,
+        system_program: _,
     } = MarketChoiceContext::load(accounts, &choice)?;
 
     let mut data = deque_account.data.borrow_mut();

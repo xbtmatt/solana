@@ -57,10 +57,6 @@ impl<'a> Deque<'a> {
         debug_assert_eq!(deque.sectors.len() % SECTOR_SIZE, 0);
         debug_assert_eq!(deque.sectors.len(), (num_sectors as usize) * SECTOR_SIZE);
 
-        if deque.sectors.len() < (HEADER_FIXED_SIZE + SECTOR_SIZE) {
-            return Err(ProgramError::InvalidAccountData);
-        }
-
         deque.init_free_stack::<MarketEscrow>(num_sectors as usize)?;
 
         Ok(())
@@ -76,6 +72,10 @@ impl<'a> Deque<'a> {
         }
         self.header.free_head = stack.get_head();
         Ok(())
+    }
+
+    pub fn get_capacity(&self) -> u32 {
+        (self.sectors.len() / SECTOR_SIZE) as u32
     }
 
     /// Construct a Deque from an existing byte vector without checking the header's discriminant.

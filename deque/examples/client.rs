@@ -66,7 +66,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
     println!("quote mint pubkey {:#?}", quote_mint.to_string());
 
     // ------------------------------------- Initialization ----------------------------------------
-    let init_data = borsh::to_vec(&DequeInstruction::Initialize { num_sectors: 10 })
+    let init_data = borsh::to_vec(&DequeInstruction::Initialize { num_sectors: 0 })
         .expect("Failed to serialize");
 
     let (vault_base_ata, vault_quote_ata) = (
@@ -405,6 +405,7 @@ pub fn send_deposit_or_withdraw(
             AccountMeta::new_readonly(spl_token::id(), false),
             AccountMeta::new_readonly(mint, false),
             AccountMeta::new(vault_ata, false),
+            AccountMeta::new_readonly(system_program::id(), false),
         ],
     );
 
