@@ -23,8 +23,6 @@ use spl_token::state::Mint;
 
 #[tokio::main]
 async fn main() {
-    let program_id = PROGRAM_ID_PUBKEY;
-
     // Connect to local cluster
     let rpc_url = String::from("http://localhost:8899");
     let client = RpcClient::new_with_commitment(rpc_url, CommitmentConfig::confirmed());
@@ -50,17 +48,17 @@ async fn main() {
     }
     println!("Airdrop confirmed\n");
 
-    // println!("=== Testing Deque<u64, 5> ===");
-    // test_u64_deque(&client, &payer, program_id);
-
     println!("=== Testing market escrow ===");
-    test_market_escrow(&client, &payer, program_id);
+    test_market_escrow(&client, &payer);
 }
 
-fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
+fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
+    const INITIAL_AMOUNT: u64 = 100000;
     // ------------------------------------ Mint two tokens ----------------------------------------
-    let (base_mint, _payer_base_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
-    let (quote_mint, _payer_quote_ata) = create_token(rpc, payer, 10, 10000).expect("Should mint.");
+    let (base_mint, _payer_base_ata) =
+        create_token(rpc, payer, 10, INITIAL_AMOUNT).expect("Should mint.");
+    let (quote_mint, _payer_quote_ata) =
+        create_token(rpc, payer, 10, INITIAL_AMOUNT).expect("Should mint.");
     let (deque_pubkey, _deque_bump) = get_deque_address(&base_mint, &quote_mint);
 
     println!("deque pubkey {:#?}", deque_pubkey.to_string());
@@ -77,7 +75,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     );
 
     let init_instruction = Instruction::new_with_bytes(
-        program_id,
+        PROGRAM_ID_PUBKEY,
         &init_data,
         vec![
             AccountMeta::new(deque_pubkey, false),
@@ -121,81 +119,75 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair, program_id: Pubkey) {
     println!("payer_ata {:#?}", payer_ata.to_string());
 
     // ----------------------------------------- Deposit -------------------------------------------
-    println!(
-        "Payer balance before: {:?}\nVault balance before: {:?}",
-        get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &deque_pubkey, &base_mint)
-    );
-
-    let deposit_ixn = Instruction::new_with_borsh(
-        program_id,
+    send_deposit_or_withdraw(
+        rpc,
+        payer,
+        deque_pubkey,
+        payer_ata,
+        base_mint,
+        vault_base_ata,
         &DequeInstruction::Deposit {
             amount: 1000,
             choice: MarketEscrowChoice::Base,
         },
-        vec![
-            AccountMeta::new(deque_pubkey, false),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new(payer_ata, false),
-            AccountMeta::new_readonly(spl_token::id(), false),
-            AccountMeta::new_readonly(base_mint, false),
-            AccountMeta::new(vault_base_ata, false),
-        ],
     );
-
-    send_txn(
-        rpc,
-        payer,
-        &[payer],
-        vec![deposit_ixn],
-        "deposit".to_string(),
-    );
-
-    println!(
-        "Payer balance after: {:?}\nVault balance after: {:?}",
-        get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &deque_pubkey, &base_mint)
-    );
-
-    inspect_account(rpc, &deque_pubkey, false);
 
     // ----------------------------------------- Withdraw -------------------------------------------
-    println!(
-        "Payer balance before: {:?}\nVault balance before: {:?}",
-        get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &deque_pubkey, &base_mint)
-    );
-
-    let withdraw_ixn = Instruction::new_with_borsh(
-        program_id,
+    send_deposit_or_withdraw(
+        rpc,
+        payer,
+        deque_pubkey,
+        payer_ata,
+        base_mint,
+        vault_base_ata,
         &DequeInstruction::Withdraw {
             choice: MarketEscrowChoice::Base,
         },
-        vec![
-            AccountMeta::new(deque_pubkey, false),
-            AccountMeta::new(payer.pubkey(), true),
-            AccountMeta::new(payer_ata, false),
-            AccountMeta::new_readonly(spl_token::id(), false),
-            AccountMeta::new_readonly(base_mint, false),
-            AccountMeta::new(vault_base_ata, false),
-        ],
     );
 
-    send_txn(
-        rpc,
-        payer,
-        &[payer],
-        vec![withdraw_ixn],
-        "withdraw".to_string(),
-    );
+    // ------------------------------------------- Fuzz --------------------------------------------
+    const ROUNDS: u64 = 10;
 
-    println!(
-        "Payer balance after: {:?}\nVault balance after: {:?}",
-        get_token_balance(rpc, &payer.pubkey(), &base_mint),
-        get_token_balance(rpc, &deque_pubkey, &base_mint)
-    );
+    for round in 0..ROUNDS {
+        println!("---------------- Fuzz round: {} ----------------", round,);
+        // Pseudo-random-ish deposits count in {1,2,3}
+        let num_deposits = ((round * 7 + 3) % 3) + 1;
 
-    inspect_account(rpc, &deque_pubkey, false);
+        let mut expected = 0;
+        for j in 0..num_deposits {
+            // Vary the deposit amount but keep it sane and non-zero
+            let amount = 1_000 + ((round * 997) ^ (j * 313)) % (INITIAL_AMOUNT * ROUNDS);
+            expected += amount;
+
+            send_deposit_or_withdraw(
+                rpc,
+                payer,
+                deque_pubkey,
+                payer_ata,
+                base_mint,
+                vault_base_ata,
+                &DequeInstruction::Deposit {
+                    amount,
+                    choice: MarketEscrowChoice::Base,
+                },
+            );
+        }
+
+        // Exactly one withdraw after ≥1 deposits
+        send_deposit_or_withdraw(
+            rpc,
+            payer,
+            deque_pubkey,
+            payer_ata,
+            base_mint,
+            vault_base_ata,
+            &DequeInstruction::Withdraw {
+                choice: MarketEscrowChoice::Base,
+            },
+        );
+
+        println!("Expected withdrawn: {}", expected);
+    }
 
     print_size_and_sectors(rpc, &deque_pubkey);
 }
@@ -372,4 +364,57 @@ pub fn get_token_balance(rpc: &RpcClient, owner: &Pubkey, mint: &Pubkey) -> u64 
         spl_token::state::Account::unpack(&acc_data).expect("Should have account data.");
 
     token_account.amount
+}
+
+pub enum DepositOrWithdraw {
+    Deposit,
+    Withdraw,
+}
+
+pub fn send_deposit_or_withdraw(
+    rpc: &RpcClient,
+    payer: &Keypair,
+    deque_pubkey: Pubkey,
+    payer_ata: Pubkey,
+    mint: Pubkey,
+    vault_ata: Pubkey,
+    deque_instruction: &DequeInstruction,
+) {
+    println!(
+        "BEFORE: payer, vault: ({}, {})",
+        get_token_balance(rpc, &payer.pubkey(), &mint),
+        get_token_balance(rpc, &deque_pubkey, &mint)
+    );
+
+    let label = match deque_instruction {
+        DequeInstruction::Deposit {
+            amount: _,
+            choice: _,
+        } => "deposit",
+        DequeInstruction::Withdraw { choice: _ } => "withdraw",
+        _ => panic!("Instruction must be deposit or withdraw."),
+    };
+
+    let ixn = Instruction::new_with_borsh(
+        PROGRAM_ID_PUBKEY,
+        deque_instruction,
+        vec![
+            AccountMeta::new(deque_pubkey, false),
+            AccountMeta::new(payer.pubkey(), true),
+            AccountMeta::new(payer_ata, false),
+            AccountMeta::new_readonly(spl_token::id(), false),
+            AccountMeta::new_readonly(mint, false),
+            AccountMeta::new(vault_ata, false),
+        ],
+    );
+
+    send_txn(rpc, payer, &[payer], vec![ixn], label.to_string());
+
+    println!(
+        "AFTER:  payer, vault: ({}, {})",
+        get_token_balance(rpc, &payer.pubkey(), &mint),
+        get_token_balance(rpc, &deque_pubkey, &mint)
+    );
+
+    inspect_account(rpc, &deque_pubkey, false);
 }
