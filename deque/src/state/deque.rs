@@ -82,6 +82,7 @@ impl<'a> Deque<'a> {
     pub fn new_from_bytes(data: &'a mut [u8]) -> Result<Self, ProgramError> {
         let (header_slab, sectors) = data.split_at_mut(HEADER_FIXED_SIZE);
         let header = from_slab_bytes_mut::<DequeHeader>(header_slab, 0_usize)?;
+        header.verify_discriminant()?;
         Ok(Self { header, sectors })
     }
 

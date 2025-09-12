@@ -30,7 +30,7 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
     check_owned_and_writable(deque_account)?;
 
     let mut deque_data = deque_account.try_borrow_mut_data()?;
-    let current_size = deque_data.len();
+    let current_size = deque_account.data_len();
     let current_lamports = deque_account.lamports();
 
     let deque = Deque::new_from_bytes(&mut deque_data)?;
@@ -41,12 +41,11 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
         deque.header.deque_bump,
     );
 
-    drop(deque_data);
-
-    let additional_space = SECTOR_SIZE * (num_sectors as usize);
-    let new_account_space = current_size + additional_space;
+    let new_account_space = current_size + SECTOR_SIZE * (num_sectors as usize);
     let new_lamports_required = Rent::get()?.minimum_balance(new_account_space);
     let lamports_diff = new_lamports_required.saturating_sub(current_lamports);
+
+    drop(deque_data);
 
     if lamports_diff > 0 {
         invoke_signed(
