@@ -93,22 +93,6 @@ impl<'a> Deque<'a> {
         Ok(Self { header, sectors })
     }
 
-    pub fn as_free_mut<P: Pod>(
-        &mut self,
-        idx: SectorIndex,
-    ) -> Result<&mut StackNode<P>, ProgramError> {
-        let free_node = from_sector_idx_mut::<StackNode<P>>(self.sectors, idx)?;
-        Ok(free_node)
-    }
-
-    pub fn as_deque_mut<P: Pod>(
-        &mut self,
-        idx: SectorIndex,
-    ) -> Result<&mut DequeNode<P>, ProgramError> {
-        let deque_node = from_sector_idx_mut::<DequeNode<P>>(self.sectors, idx)?;
-        Ok(deque_node)
-    }
-
     pub fn push_front<P: Pod + Zeroable + std::fmt::Debug>(
         &mut self,
         value: P,

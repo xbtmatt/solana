@@ -5,7 +5,8 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
-    state::{Deque, MarketEscrow, MarketEscrowChoice},
+    state::{Deque, DequeNode, MarketEscrow, MarketEscrowChoice},
+    utils::from_sector_idx_mut,
 };
 
 pub fn process(
@@ -22,12 +23,7 @@ pub fn process(
         vault_ata,
     } = MarketChoiceContext::load(accounts, &choice)?;
 
-    let (base_amt, quote_amt) = match choice {
-        MarketEscrowChoice::Base => (amount, 0),
-        MarketEscrowChoice::Quote => (0, amount),
-    };
-
-    // Transfer from the payer's token account to the vault's token account.
+    // Transfer from the payer's token account to the vault (the deque's token account).
     invoke(
         &spl_token::instruction::transfer(
             token_program.key,
@@ -45,22 +41,49 @@ pub fn process(
         ],
     )?;
 
-    // TODO: Check if the user already has existing funds within the deque.
-    // Ideally they're consolidated into a single node.
-    // I believe it's possible to validate/verify that a client-passed-in memory address is a valid
-    // node for a user without having to traverse it in the smart contract, since the sector sizes
-    // will be fixed and aligned. Simply verify the pubkey matches and then operate from there.
-    // If this is too complex and/or unsafe, just traverse the deque.
-
-    // Now push a node indicating that this user has escrowed tokens.
+    // Try to find the trader in existing nodes.
     let mut data = deque_account.data.borrow_mut();
     // The deque's account discriminant is checked in `load`.
     let mut deque = Deque::new_from_bytes_unchecked(&mut data)?;
-    let escrow = MarketEscrow::new(*payer.key, base_amt, quote_amt);
+    let maybe_idx = deque
+        .iter_nodes::<MarketEscrow>()
+        .find(|(node, _)| node.trader.as_ref() == payer.key.as_ref())
+        .map(|(_, idx)| idx);
 
-    deque
-        .push_front(escrow)
-        .map_err(|_| ProgramError::InvalidAccountData)?;
+    match maybe_idx {
+        // Mutate the node.
+        Some(idx) => {
+            let node = from_sector_idx_mut::<DequeNode<MarketEscrow>>(deque.sectors, idx)?;
+            match choice {
+                // Update the base amount in the existing node.
+                MarketEscrowChoice::Base => {
+                    node.inner.base = node
+                        .inner
+                        .base
+                        .checked_add(amount)
+                        .ok_or(ProgramError::InvalidArgument)?;
+                }
+                // Update the quote amount in the existing node.
+                MarketEscrowChoice::Quote => {
+                    node.inner.quote = node
+                        .inner
+                        .quote
+                        .checked_add(amount)
+                        .ok_or(ProgramError::InvalidArgument)?;
+                }
+            }
+        }
+        // Push a new node to the front of the deque.
+        None => {
+            let escrow = match choice {
+                MarketEscrowChoice::Base => MarketEscrow::new(*payer.key, amount, 0),
+                MarketEscrowChoice::Quote => MarketEscrow::new(*payer.key, 0, amount),
+            };
+            deque
+                .push_front(escrow)
+                .map_err(|_| ProgramError::InvalidAccountData)?;
+        }
+    }
 
     Ok(())
 }
