@@ -10,16 +10,16 @@ pub const HEADER_FIXED_SIZE: usize = 96;
 #[derive(Clone, Copy, Debug, Zeroable)]
 pub struct DequeHeader {
     pub discriminant: u64,
-    pub version: u8,
-    pub _padding: [u8; 3],
     pub len: SectorIndex,
     pub free_head: SectorIndex,
     pub deque_head: SectorIndex,
     pub deque_tail: SectorIndex,
-    pub _padding2: [u8; 3],
-    pub deque_bump: u8,
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
+    pub version: u8,
+    pub deque_bump: u8,
+    // Explicitly mark the padding that repr(C) will add implicitly.
+    pub _padding: [u8; 6],
 }
 
 unsafe impl Pod for DequeHeader {}
@@ -30,16 +30,15 @@ impl DequeHeader {
     pub fn new_empty(deque_bump: u8, base_mint: &Pubkey, quote_mint: &Pubkey) -> Self {
         DequeHeader {
             discriminant: DEQUE_ACCOUNT_DISCRIMINANT,
-            version: 0,
-            _padding: [0; 3],
+            base_mint: *base_mint,
+            quote_mint: *quote_mint,
             len: 0,
             free_head: NIL,
             deque_head: NIL,
             deque_tail: NIL,
-            _padding2: [0; 3],
+            version: 0,
             deque_bump,
-            base_mint: *base_mint,
-            quote_mint: *quote_mint,
+            _padding: [0; 6],
         }
     }
 
@@ -57,15 +56,13 @@ const_assert_eq!(size_of::<DequeHeader>(), HEADER_FIXED_SIZE);
 const_assert_eq!(
     HEADER_FIXED_SIZE,
     8 + // discriminant
-    1 + // version
-    3 + // padding
     4 + // len
     4 + // free_head
     4 + // deque_head
     4 + // deque_tail
-    3 + // padding2
-    1 + // deque_bump
     32 + // base_mint
-    32 // quote_mint
+    32 + // quote_mint
+    1 + // version
+    1 + // deque_bump
+    6 // _padding
 );
-const_assert_eq!(size_of::<DequeHeader>() % 8, 0);
