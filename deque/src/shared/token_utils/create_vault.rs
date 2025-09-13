@@ -1,6 +1,4 @@
-use solana_program::{
-    account_info::AccountInfo, program::invoke, program_error::ProgramError, pubkey::Pubkey,
-};
+use solana_program::{account_info::AccountInfo, program::invoke, program_error::ProgramError};
 
 pub fn create_token_vault<'a, 'info>(
     payer: &'a AccountInfo<'info>,
@@ -39,31 +37,4 @@ pub fn create_token_vault<'a, 'info>(
     }
 
     Ok(())
-}
-
-#[derive(Clone)]
-pub struct TokenAccountInfo<'a, 'info> {
-    pub info: &'a AccountInfo<'info>,
-}
-
-impl<'a, 'info> TokenAccountInfo<'a, 'info> {
-    pub fn new_checked_owners(
-        info: &'a AccountInfo<'info>,
-        mint: &Pubkey,
-        owner: &Pubkey,
-    ) -> Result<TokenAccountInfo<'a, 'info>, ProgramError> {
-        // TODO: Add spl_token_2022 support here.
-        // The account owner should be a token program.
-        if info.owner != &spl_token::id() ||
-            // Mint pubkeys are at the 0 byte offset of the token account data. Verify it matches.
-            &info.try_borrow_data()?[0..32] != mint.as_ref() ||
-            // Token owner pubkeys are at the 32 byte offset of the token account data.
-            &info.try_borrow_data()?[32..64] != owner.as_ref()
-        {
-            return Err(ProgramError::IllegalOwner);
-        }
-        let token_acc_info = TokenAccountInfo { info };
-
-        Ok(token_acc_info)
-    }
 }

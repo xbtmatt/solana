@@ -4,8 +4,8 @@ use solana_program::{
 };
 
 use crate::{
+    shared::token_utils::token_account_info::TokenAccountInfo,
     state::{Deque, MarketEscrowChoice},
-    token_utils::TokenAccountInfo,
     utils::check_owned_and_writable,
 };
 

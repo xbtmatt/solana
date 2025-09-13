@@ -12,8 +12,8 @@ use solana_program::{
 
 use crate::{
     deque_seeds_with_bump,
+    shared::token_utils::create_vault::create_token_vault,
     state::{Deque, HEADER_FIXED_SIZE},
-    token_utils::create_token_vault,
     utils::{check_derivations_and_get_bump, SECTOR_SIZE},
 };
 
