@@ -1,4 +1,4 @@
-use solana_program::{account_info::AccountInfo, program::invoke, program_error::ProgramError};
+use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, program::invoke};
 
 pub fn create_token_vault<'a, 'info>(
     payer: &'a AccountInfo<'info>,
@@ -10,7 +10,7 @@ pub fn create_token_vault<'a, 'info>(
         &'a AccountInfo<'info>,
         &'a AccountInfo<'info>,
     ),
-) -> Result<(), ProgramError> {
+) -> ProgramResult {
     let (token_program, spl_ata_program, system_program) = program_accounts;
     let (base_mint, quote_mint) = base_and_quote_mints;
     let (vault_base_ata, vault_quote_ata) = vault_base_and_quote_atas;

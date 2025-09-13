@@ -1,10 +1,11 @@
 use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, msg, program::invoke,
-    program_error::ProgramError, pubkey::Pubkey,
+    account_info::AccountInfo, entrypoint::ProgramResult, msg, program_error::ProgramError,
+    pubkey::Pubkey,
 };
 
 use crate::{
     context::market_choice::MarketChoiceContext,
+    shared::token_utils::vault_transfers::deposit_to_vault,
     state::{Deque, DequeNode, MarketEscrow, MarketEscrowChoice},
     utils::{from_sector_idx_mut, inline_resize},
 };
@@ -12,35 +13,20 @@ use crate::{
 pub fn process(
     _program_id: &Pubkey,
     accounts: &[AccountInfo],
-    amount: u64,
+    amount_in: u64,
     choice: MarketEscrowChoice,
 ) -> ProgramResult {
+    let ctx = MarketChoiceContext::load(accounts, choice)?;
+
+    let amount = deposit_to_vault(&ctx, amount_in)?;
+
     let MarketChoiceContext {
         deque_account,
         payer,
-        payer_ata,
-        token_program,
-        vault_ata,
         system_program,
-    } = MarketChoiceContext::load(accounts, &choice)?;
-
-    // Transfer from the payer's token account to the vault (the deque's token account).
-    invoke(
-        &spl_token::instruction::transfer(
-            token_program.key,
-            payer_ata.key,
-            vault_ata.key,
-            payer.key,
-            &[],
-            amount,
-        )?,
-        &[
-            token_program.as_ref().clone(),
-            payer_ata.as_ref().clone(),
-            vault_ata.as_ref().clone(),
-            payer.as_ref().clone(),
-        ],
-    )?;
+        choice,
+        ..
+    } = ctx;
 
     // Try to find the trader in existing nodes.
     let mut data = deque_account.data.borrow_mut();

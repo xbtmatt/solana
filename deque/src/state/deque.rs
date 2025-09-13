@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use solana_program::{msg, program_error::ProgramError, pubkey::Pubkey};
+use solana_program::{entrypoint::ProgramResult, msg, program_error::ProgramError, pubkey::Pubkey};
 use static_assertions::const_assert_eq;
 
 use crate::{
@@ -45,7 +45,7 @@ impl<'a> Deque<'a> {
         deque_bump: u8,
         base_mint: &Pubkey,
         quote_mint: &Pubkey,
-    ) -> Result<(), ProgramError> {
+    ) -> ProgramResult {
         if data.len() < HEADER_FIXED_SIZE {
             return Err(ProgramError::InvalidAccountData);
         }
@@ -62,10 +62,7 @@ impl<'a> Deque<'a> {
         Ok(())
     }
 
-    pub fn init_free_stack<T: Pod + Zeroable>(
-        &mut self,
-        num_sectors: usize,
-    ) -> Result<(), ProgramError> {
+    pub fn init_free_stack<T: Pod + Zeroable>(&mut self, num_sectors: usize) -> ProgramResult {
         let mut stack = Stack::<T>::new(self.sectors, self.header.free_head);
         for s in (0..num_sectors).rev() {
             stack.push_to_free(s as SectorIndex)?;

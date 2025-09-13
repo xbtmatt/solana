@@ -20,7 +20,7 @@ impl MarketEscrow {
         }
     }
 
-    pub fn amount_from_choice(&self, choice: MarketEscrowChoice) -> u64 {
+    pub fn amount_from_choice(&self, choice: &MarketEscrowChoice) -> u64 {
         match choice {
             MarketEscrowChoice::Base => self.base,
             MarketEscrowChoice::Quote => self.quote,

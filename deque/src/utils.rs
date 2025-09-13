@@ -87,7 +87,7 @@ pub fn log_bytes(bytes: &[u8]) {
 }
 
 #[inline(always)]
-pub fn check_owned_and_writable(account: &AccountInfo) -> Result<(), ProgramError> {
+pub fn check_owned_and_writable(account: &AccountInfo) -> ProgramResult {
     if account.owner.as_array() != PROGRAM_ID_PUBKEY.as_array() {
         msg!("account not owned by program");
         return Err(ProgramError::IncorrectProgramId);

@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use solana_program::program_error::ProgramError;
+use solana_program::{entrypoint::ProgramResult, program_error::ProgramError};
 
 use crate::{
     state::DequeNode,
@@ -40,7 +40,7 @@ impl<'a, T: Pod> Stack<'a, T> {
         }
     }
 
-    pub fn push_to_free(&mut self, idx: SectorIndex) -> Result<(), ProgramError> {
+    pub fn push_to_free(&mut self, idx: SectorIndex) -> ProgramResult {
         let node: &mut StackNode<T> = from_sector_idx_mut::<StackNode<T>>(self.data, idx)?;
         node.inner = T::zeroed();
         node.next = self.head;

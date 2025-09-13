@@ -1,6 +1,6 @@
 use crate::utils::{SectorIndex, Slab, NIL};
 use bytemuck::{Pod, Zeroable};
-use solana_program::{program_error::ProgramError, pubkey::Pubkey};
+use solana_program::{entrypoint::ProgramResult, program_error::ProgramError, pubkey::Pubkey};
 use static_assertions::const_assert_eq;
 
 pub const DEQUE_ACCOUNT_DISCRIMINANT: u64 = 0xf00dbabe;
@@ -43,7 +43,7 @@ impl DequeHeader {
     }
 
     #[inline]
-    pub fn verify_discriminant(&self) -> Result<(), ProgramError> {
+    pub fn verify_discriminant(&self) -> ProgramResult {
         if self.discriminant != DEQUE_ACCOUNT_DISCRIMINANT {
             return Err(ProgramError::InvalidAccountData);
         }

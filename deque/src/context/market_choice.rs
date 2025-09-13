@@ -4,7 +4,7 @@ use solana_program::{
 };
 
 use crate::{
-    shared::token_utils::token_account_info::TokenAccountInfo,
+    shared::token_utils::token_account_infos::{TokenAccountInfo, TokenMintInfo, TokenProgramInfo},
     state::{Deque, MarketEscrowChoice},
     utils::check_owned_and_writable,
 };
@@ -13,16 +13,18 @@ use crate::{
 pub struct MarketChoiceContext<'a, 'info> {
     pub deque_account: &'a AccountInfo<'info>,
     pub payer: &'a AccountInfo<'info>,
-    pub payer_ata: &'a AccountInfo<'info>,
-    pub token_program: &'a AccountInfo<'info>,
-    pub vault_ata: &'a AccountInfo<'info>,
+    pub payer_ata: TokenAccountInfo<'a, 'info>,
+    pub token_program: TokenProgramInfo<'a, 'info>,
+    pub vault_ata: TokenAccountInfo<'a, 'info>,
     pub system_program: &'a AccountInfo<'info>,
+    pub mint_info: TokenMintInfo<'a, 'info>,
+    pub choice: MarketEscrowChoice,
 }
 
 impl<'a, 'info> MarketChoiceContext<'a, 'info> {
     pub fn load(
         accounts: &'a [AccountInfo<'info>],
-        choice: &MarketEscrowChoice,
+        choice: MarketEscrowChoice,
     ) -> Result<MarketChoiceContext<'a, 'info>, ProgramError> {
         let accounts_iter = &mut accounts.iter();
         let deque_account = next_account_info(accounts_iter)?;
@@ -44,12 +46,14 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
 
         // Ensure the mint pubkey passed into account data matches the mint in header data.
         if mint_in.key.as_ref() != mint.as_ref() {
-            return Err(ProgramError::IllegalOwner);
+            return Err(ProgramError::InvalidInstructionData);
         }
 
-        let (payer_ata, vault_ata) = (
-            TokenAccountInfo::new_checked_owners(payer_ata, &mint, payer.key)?.info,
-            TokenAccountInfo::new_checked_owners(vault_ata, &mint, deque_account.key)?.info,
+        let (payer_ata, vault_ata, token_program, mint_info) = (
+            TokenAccountInfo::new_checked_owners(payer_ata, &mint, payer.key)?,
+            TokenAccountInfo::new_checked_owners(vault_ata, &mint, deque_account.key)?,
+            TokenProgramInfo::new_checked(token_program)?,
+            TokenMintInfo::new_checked(mint_in)?,
         );
 
         Ok(MarketChoiceContext {
@@ -59,6 +63,8 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
             token_program,
             vault_ata,
             system_program,
+            mint_info,
+            choice,
         })
     }
 }
