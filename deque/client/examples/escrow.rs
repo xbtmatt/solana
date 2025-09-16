@@ -7,7 +7,6 @@ use deque::{
     PROGRAM_ID_PUBKEY,
 };
 use solana_client::rpc_client::RpcClient;
-use solana_program::example_mocks::solana_sdk::system_instruction;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
     instruction::{AccountMeta, Instruction},
@@ -15,7 +14,7 @@ use solana_sdk::{
     program_pack::Pack,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
-    system_program,
+    system_instruction, system_program,
     transaction::Transaction,
 };
 use spl_associated_token_account::get_associated_token_address;

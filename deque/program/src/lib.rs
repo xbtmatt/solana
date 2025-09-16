@@ -9,10 +9,9 @@ pub mod instructions;
 pub mod processor;
 pub mod shared;
 pub mod state;
-pub mod tests;
 pub mod utils;
 
-pub const PROGRAM_ID_STR: &str = "9SM4HUDDWsKDs9wCkfdGwkfDtUL9WwXUnmqdwNnZTzBW";
+pub const PROGRAM_ID_STR: &str = "HUCYsC4SmiyEbzWWUho7sCZAngJMV2u7tGgqPkG9GLUe";
 pub const PROGRAM_ID_PUBKEY: Pubkey = Pubkey::from_str_const(PROGRAM_ID_STR);
 
 declare_id!(PROGRAM_ID_STR);

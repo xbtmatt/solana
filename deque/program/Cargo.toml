@@ -1,0 +1,22 @@
+[package]
+name = "deque"
+version = "0.1.0"
+edition = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+borsh = { workspace = true }
+bytemuck = { workspace = true }
+solana-program = { workspace = true }
+spl-associated-token-account = { workspace = true }
+spl-token = { workspace = true }
+spl-token-2022 = { workspace = true }
+static_assertions = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
