@@ -98,20 +98,22 @@ pub struct DequeContext {
     pub deque_pubkey: Pubkey,
     pub vault_base_ata: Pubkey,
     pub vault_quote_ata: Pubkey,
-    pub token_program: Pubkey,
+    pub base_token_program: Pubkey,
+    pub quote_token_program: Pubkey,
     pub ata_program: Pubkey,
 }
 
 impl DequeContext {
     pub fn create_ata_ixn(&self, payer: &Keypair, choice: MarketEscrowChoice) -> Instruction {
+        let (mint, token_program) = match choice {
+            MarketEscrowChoice::Base => (&self.base_mint, &self.base_token_program),
+            MarketEscrowChoice::Quote => (&self.quote_mint, &self.quote_token_program),
+        };
         spl_associated_token_account::instruction::create_associated_token_account_idempotent(
             &payer.pubkey(),
             &payer.pubkey(),
-            match choice {
-                MarketEscrowChoice::Base => &self.base_mint,
-                MarketEscrowChoice::Quote => &self.quote_mint,
-            },
-            &self.token_program,
+            mint,
+            token_program,
         )
     }
 
@@ -120,16 +122,16 @@ impl DequeContext {
             PROGRAM_ID_PUBKEY,
             &DequeInstruction::Initialize { num_sectors },
             vec![
-                AccountMeta::new(self.deque_pubkey, false),
                 AccountMeta::new(payer.pubkey(), true),
-                AccountMeta::new_readonly(system_program::id(), false),
-                AccountMeta::new_readonly(self.token_program, false),
-                // For the ATA creation inside the program.
-                AccountMeta::new(self.vault_base_ata, false),
-                AccountMeta::new(self.vault_quote_ata, false),
+                AccountMeta::new(self.deque_pubkey, false),
                 AccountMeta::new_readonly(self.base_mint, false),
                 AccountMeta::new_readonly(self.quote_mint, false),
+                AccountMeta::new(self.vault_base_ata, false),
+                AccountMeta::new(self.vault_quote_ata, false),
+                AccountMeta::new_readonly(self.base_token_program, false),
+                AccountMeta::new_readonly(self.quote_token_program, false),
                 AccountMeta::new_readonly(self.ata_program, false),
+                AccountMeta::new_readonly(system_program::id(), false),
             ],
         )
     }
@@ -150,13 +152,17 @@ pub fn generate_deque(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<DequeC
         get_associated_token_address(&deque_pubkey, &quote_mint),
     );
 
+    println!("vault_base_ata: {}", vault_base_ata);
+    println!("vault_quote_ata: {}", vault_quote_ata);
+
     Ok(DequeContext {
         base_mint,
         quote_mint,
         deque_pubkey,
         vault_base_ata,
         vault_quote_ata,
-        token_program: spl_token::id(),
+        base_token_program: spl_token::id(),
+        quote_token_program: spl_token::id(),
         ata_program: spl_associated_token_account::id(),
     })
 }

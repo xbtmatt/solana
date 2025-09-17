@@ -29,7 +29,8 @@ impl<'a, 'info> TokenAccountInfo<'a, 'info> {
         require!(
             info.owner == &spl_token::id() || info.owner == &spl_token_2022::id(),
             ProgramError::IllegalOwner,
-            "Associated token account owner must be owned by a token program."
+            "Associated token account owner must be owned by a token program: {:?}",
+            mint.as_ref()
         )?;
 
         require!(
@@ -138,6 +139,25 @@ impl<'a, 'info> TokenProgramInfo<'a, 'info> {
             info,
             program_type: token_program,
         })
+    }
+}
+
+#[derive(Clone)]
+pub struct AssociatedTokenProgramInfo<'a, 'info> {
+    pub info: &'a AccountInfo<'info>,
+}
+
+impl<'a, 'info> AssociatedTokenProgramInfo<'a, 'info> {
+    pub fn new_checked(
+        info: &'a AccountInfo<'info>,
+    ) -> Result<AssociatedTokenProgramInfo<'a, 'info>, ProgramError> {
+        require!(
+            info.key.as_ref() == spl_associated_token_account::id().as_ref(),
+            ProgramError::IncorrectProgramId,
+            "Associated token program isn't valid"
+        )?;
+
+        Ok(AssociatedTokenProgramInfo { info })
     }
 }
 

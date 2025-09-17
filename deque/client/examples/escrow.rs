@@ -1,19 +1,15 @@
-use deque::{
-    state::{DequeInstruction, MarketEscrowChoice},
-    PROGRAM_ID_PUBKEY,
-};
+use deque::state::{DequeInstruction, MarketEscrowChoice};
 use deque_client::{
     logs::print_size_and_sectors,
-    tokens::{generate_deque, DequeContext, INITIAL_MINT_AMOUNT},
+    tokens::{generate_deque, INITIAL_MINT_AMOUNT},
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
 };
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    instruction::{AccountMeta, Instruction},
     signature::{Keypair, Signer},
-    system_program,
 };
+use spl_associated_token_account::get_associated_token_address;
 
 #[tokio::main]
 async fn main() {
@@ -27,12 +23,14 @@ async fn main() {
 
 fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
     // ----------------------- Mint two tokens and generate deque address --------------------------
-    let deque_ctx = generate_deque(rpc, payer).expect("Should be able to generate deque");
+    let ctx = generate_deque(rpc, payer).expect("Should be able to generate deque");
+    let payer_base_ata = get_associated_token_address(&payer.pubkey(), &ctx.base_mint);
+    let _payer_quote_ata = get_associated_token_address(&payer.pubkey(), &ctx.quote_mint);
 
-    // println!("deque pubkey {:#?}", deque_pubkey.to_string());
-    // println!("base mint pubkey {:#?}", base_mint.to_string());
-    // println!("quote mint pubkey {:#?}", quote_mint.to_string());
-    // println!("payer_base_ata {:#?}", payer_base_ata.to_string());
+    println!("deque pubkey {:#?}", ctx.deque_pubkey.to_string());
+    println!("base mint pubkey {:#?}", ctx.base_mint.to_string());
+    println!("quote mint pubkey {:#?}", ctx.quote_mint.to_string());
+    println!("payer_base_ata {:#?}", payer_base_ata.to_string());
 
     // ------------------------------------- Initialization ----------------------------------------
     // Create both payer ATAs.
@@ -41,9 +39,9 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         payer,
         &[payer],
         vec![
-            deque_ctx.create_ata_ixn(payer, MarketEscrowChoice::Base),
-            deque_ctx.create_ata_ixn(payer, MarketEscrowChoice::Quote),
-            deque_ctx.initialize_deque_ixn(payer, 0),
+            ctx.create_ata_ixn(payer, MarketEscrowChoice::Base),
+            ctx.create_ata_ixn(payer, MarketEscrowChoice::Quote),
+            ctx.initialize_deque_ixn(payer, 0),
         ],
         "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
     );
@@ -52,10 +50,10 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
     send_deposit_or_withdraw(
         rpc,
         payer,
-        deque_pubkey,
+        ctx.deque_pubkey,
         payer_base_ata,
-        base_mint,
-        vault_base_ata,
+        ctx.base_mint,
+        ctx.vault_base_ata,
         &DequeInstruction::Deposit {
             amount: 1000,
             choice: MarketEscrowChoice::Base,
@@ -66,10 +64,10 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
     send_deposit_or_withdraw(
         rpc,
         payer,
-        deque_pubkey,
+        ctx.deque_pubkey,
         payer_base_ata,
-        base_mint,
-        vault_base_ata,
+        ctx.base_mint,
+        ctx.vault_base_ata,
         &DequeInstruction::Withdraw {
             choice: MarketEscrowChoice::Base,
         },
@@ -92,10 +90,10 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             send_deposit_or_withdraw(
                 rpc,
                 payer,
-                deque_pubkey,
+                ctx.deque_pubkey,
                 payer_base_ata,
-                base_mint,
-                vault_base_ata,
+                ctx.base_mint,
+                ctx.vault_base_ata,
                 &DequeInstruction::Deposit {
                     amount,
                     choice: MarketEscrowChoice::Base,
@@ -107,10 +105,10 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         send_deposit_or_withdraw(
             rpc,
             payer,
-            deque_pubkey,
+            ctx.deque_pubkey,
             payer_base_ata,
-            base_mint,
-            vault_base_ata,
+            ctx.base_mint,
+            ctx.vault_base_ata,
             &DequeInstruction::Withdraw {
                 choice: MarketEscrowChoice::Base,
             },
@@ -119,5 +117,5 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         println!("Expected withdrawn: {}", expected);
     }
 
-    print_size_and_sectors(rpc, &deque_pubkey);
+    print_size_and_sectors(rpc, &ctx.deque_pubkey);
 }
