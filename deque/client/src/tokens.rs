@@ -1,7 +1,12 @@
 use anyhow::Context;
-use deque::state::get_deque_address;
+use deque::{
+    state::{get_deque_address, DequeInstruction, MarketEscrowChoice},
+    PROGRAM_ID_PUBKEY,
+};
 use solana_client::rpc_client::RpcClient;
+use solana_program::example_mocks::solana_sdk::system_program;
 use solana_sdk::{
+    instruction::{AccountMeta, Instruction},
     program_pack::Pack,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
@@ -87,28 +92,57 @@ pub fn get_token_balance(rpc: &RpcClient, owner: &Pubkey, mint: &Pubkey) -> u64 
     token_account.amount
 }
 
-pub struct GeneratedDequeContext {
+pub struct DequeContext {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
-    pub payer_base_ata: Pubkey,
-    pub payer_quote_ata: Pubkey,
     pub deque_pubkey: Pubkey,
     pub vault_base_ata: Pubkey,
     pub vault_quote_ata: Pubkey,
+    pub token_program: Pubkey,
+    pub ata_program: Pubkey,
+}
+
+impl DequeContext {
+    pub fn create_ata_ixn(&self, payer: &Keypair, choice: MarketEscrowChoice) -> Instruction {
+        spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+            &payer.pubkey(),
+            &payer.pubkey(),
+            match choice {
+                MarketEscrowChoice::Base => &self.base_mint,
+                MarketEscrowChoice::Quote => &self.quote_mint,
+            },
+            &self.token_program,
+        )
+    }
+
+    pub fn initialize_deque_ixn(&self, payer: &Keypair, num_sectors: u16) -> Instruction {
+        Instruction::new_with_borsh(
+            PROGRAM_ID_PUBKEY,
+            &DequeInstruction::Initialize { num_sectors },
+            vec![
+                AccountMeta::new(self.deque_pubkey, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new_readonly(system_program::id(), false),
+                AccountMeta::new_readonly(self.token_program, false),
+                // For the ATA creation inside the program.
+                AccountMeta::new(self.vault_base_ata, false),
+                AccountMeta::new(self.vault_quote_ata, false),
+                AccountMeta::new_readonly(self.base_mint, false),
+                AccountMeta::new_readonly(self.quote_mint, false),
+                AccountMeta::new_readonly(self.ata_program, false),
+            ],
+        )
+    }
 }
 
 pub const INITIAL_MINT_AMOUNT: u64 = 100000;
 
-pub fn generate_deque(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<GeneratedDequeContext> {
-    let (base_mint, payer_base_ata) =
+pub fn generate_deque(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<DequeContext> {
+    let (base_mint, _) =
         create_token(rpc, payer, 10, INITIAL_MINT_AMOUNT).context("failed to mint base")?;
-    let (quote_mint, payer_quote_ata) =
+    let (quote_mint, _) =
         create_token(rpc, payer, 10, INITIAL_MINT_AMOUNT).context("failed to mint quote")?;
-    let (deque_pubkey, _deque_bump) = get_deque_address(&base_mint, &quote_mint);
-
-    println!("deque pubkey {:#?}", deque_pubkey.to_string());
-    println!("base mint pubkey {:#?}", base_mint.to_string());
-    println!("quote mint pubkey {:#?}", quote_mint.to_string());
+    let (deque_pubkey, _) = get_deque_address(&base_mint, &quote_mint);
 
     // ------------------------------------- Initialization ----------------------------------------
     let (vault_base_ata, vault_quote_ata) = (
@@ -116,13 +150,13 @@ pub fn generate_deque(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<Genera
         get_associated_token_address(&deque_pubkey, &quote_mint),
     );
 
-    Ok(GeneratedDequeContext {
+    Ok(DequeContext {
         base_mint,
         quote_mint,
-        payer_base_ata,
-        payer_quote_ata,
         deque_pubkey,
         vault_base_ata,
         vault_quote_ata,
+        token_program: spl_token::id(),
+        ata_program: spl_associated_token_account::id(),
     })
 }

@@ -4,7 +4,7 @@ use deque::{
 };
 use deque_client::{
     logs::print_size_and_sectors,
-    tokens::{generate_deque, GeneratedDequeContext, INITIAL_MINT_AMOUNT},
+    tokens::{generate_deque, DequeContext, INITIAL_MINT_AMOUNT},
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
 };
 use solana_client::rpc_client::RpcClient;
@@ -27,53 +27,25 @@ async fn main() {
 
 fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
     // ----------------------- Mint two tokens and generate deque address --------------------------
-    let GeneratedDequeContext {
-        base_mint,
-        quote_mint,
-        payer_base_ata,
-        payer_quote_ata: _,
-        deque_pubkey,
-        vault_base_ata,
-        vault_quote_ata,
-    } = generate_deque(rpc, payer).expect("Should be able to generate deque");
+    let deque_ctx = generate_deque(rpc, payer).expect("Should be able to generate deque");
 
-    println!("deque pubkey {:#?}", deque_pubkey.to_string());
-    println!("base mint pubkey {:#?}", base_mint.to_string());
-    println!("quote mint pubkey {:#?}", quote_mint.to_string());
-    println!("payer_base_ata {:#?}", payer_base_ata.to_string());
+    // println!("deque pubkey {:#?}", deque_pubkey.to_string());
+    // println!("base mint pubkey {:#?}", base_mint.to_string());
+    // println!("quote mint pubkey {:#?}", quote_mint.to_string());
+    // println!("payer_base_ata {:#?}", payer_base_ata.to_string());
 
     // ------------------------------------- Initialization ----------------------------------------
+    // Create both payer ATAs.
     send_txn(
         rpc,
         payer,
         &[payer],
         vec![
-            // Initialize the deque
-            Instruction::new_with_borsh(
-                PROGRAM_ID_PUBKEY,
-                &DequeInstruction::Initialize { num_sectors: 0 },
-                vec![
-                    AccountMeta::new(deque_pubkey, false),
-                    AccountMeta::new(payer.pubkey(), true),
-                    AccountMeta::new_readonly(system_program::id(), false),
-                    AccountMeta::new_readonly(spl_token::id(), false),
-                    // For the ATA creation inside the program.
-                    AccountMeta::new(vault_base_ata, false),
-                    AccountMeta::new(vault_quote_ata, false),
-                    AccountMeta::new_readonly(base_mint, false),
-                    AccountMeta::new_readonly(quote_mint, false),
-                    AccountMeta::new_readonly(spl_associated_token_account::id(), false),
-                ],
-            ),
-            // Then create the base mint ATA for the payer.
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                &payer.pubkey(),
-                &payer.pubkey(),
-                &base_mint,
-                &spl_token::id(),
-            ),
+            deque_ctx.create_ata_ixn(payer, MarketEscrowChoice::Base),
+            deque_ctx.create_ata_ixn(payer, MarketEscrowChoice::Quote),
+            deque_ctx.initialize_deque_ixn(payer, 0),
         ],
-        "create associated token account and initialize market deque".to_string(),
+        "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
     );
 
     // ----------------------------------------- Deposit -------------------------------------------

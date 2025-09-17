@@ -10,6 +10,7 @@ pub mod processor;
 pub mod shared;
 pub mod state;
 pub mod utils;
+pub mod validation;
 
 pub const PROGRAM_ID_STR: &str = "HUCYsC4SmiyEbzWWUho7sCZAngJMV2u7tGgqPkG9GLUe";
 pub const PROGRAM_ID_PUBKEY: Pubkey = Pubkey::from_str_const(PROGRAM_ID_STR);

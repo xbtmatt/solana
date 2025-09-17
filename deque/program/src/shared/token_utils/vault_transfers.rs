@@ -6,7 +6,7 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext, deque_seeds_with_bump,
-    shared::token_utils::token_account_infos::TokenProgram, state::Deque,
+    loaders::token_accounts::TokenProgram, state::Deque,
 };
 
 pub fn deposit_to_vault<'a, 'info>(
