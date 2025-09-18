@@ -48,8 +48,8 @@ pub enum DequeInstruction {
 }
 
 impl DequeInstruction {
-    pub fn pack(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(size_of::<Self>());
+    /// Extends a buffer with packed instruction bytes.
+    pub fn pack_into(&self, buf: &mut Vec<u8>) {
         match self {
             Self::Initialize { num_sectors } => {
                 buf.push(0);
@@ -72,7 +72,12 @@ impl DequeInstruction {
                 buf.push(4);
             }
         }
+    }
 
+    /// More ergonomic but over-allocates memory for ergonomics.
+    pub fn pack(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(size_of::<Self>());
+        self.pack_into(&mut buf);
         buf
     }
 

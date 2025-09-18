@@ -1,6 +1,6 @@
 // use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::instruction_enum::DequeInstruction;
+// use crate::instruction_enum::DequeInstruction;
 
 pub mod event_emitter;
 
