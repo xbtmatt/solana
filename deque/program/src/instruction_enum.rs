@@ -1,4 +1,4 @@
-use solana_program::program_error::ProgramError;
+use solana_program::{msg, program_error::ProgramError};
 
 #[repr(u8)]
 #[derive(Clone, Debug, PartialEq)]
@@ -60,7 +60,7 @@ impl DequeInstruction {
                 buf.extend_from_slice(&num_sectors.to_le_bytes());
             }
             Self::Deposit { ref choice, amount } => {
-                buf.push(1);
+                buf.push(2);
                 buf.push(choice.into());
                 buf.extend_from_slice(&amount.to_le_bytes());
             }
@@ -83,6 +83,7 @@ impl DequeInstruction {
 
         Ok(match tag {
             0 => {
+                msg!("ixn data: {:?}", instruction_data);
                 let num_sectors = unpack_u16(instruction_data)?;
                 DequeInstruction::Initialize { num_sectors }
             }
