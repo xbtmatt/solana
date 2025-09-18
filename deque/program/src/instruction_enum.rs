@@ -33,18 +33,18 @@ impl TryFrom<u8> for MarketEscrowChoice {
 pub enum DequeInstruction {
     Initialize {
         num_sectors: u16,
-    },
+    } = 0,
     Resize {
         num_sectors: u16,
-    },
+    } = 1,
     Deposit {
         choice: MarketEscrowChoice,
         amount: u64,
-    },
+    } = 2,
     Withdraw {
         choice: MarketEscrowChoice,
-    },
-    FlushEventLog,
+    } = 3,
+    FlushEventLog = 4,
 }
 
 impl DequeInstruction {
