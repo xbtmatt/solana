@@ -7,7 +7,7 @@ pub enum MarketEscrowChoice {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
-pub enum DequeInstruction {
+pub enum DequeInstructionBorsh {
     Initialize {
         num_sectors: u16,
     },
@@ -21,4 +21,5 @@ pub enum DequeInstruction {
     Withdraw {
         choice: MarketEscrowChoice,
     },
+    FlushEventLog {},
 }
