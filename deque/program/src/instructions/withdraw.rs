@@ -5,8 +5,9 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
+    instruction_enum::MarketEscrowChoice,
     shared::token_utils::vault_transfers::withdraw_from_vault,
-    state::{Deque, MarketEscrow, MarketEscrowChoice},
+    state::{Deque, MarketEscrow},
 };
 
 pub fn process(

@@ -1,4 +1,4 @@
-use deque::state::{DequeInstruction, MarketEscrowChoice};
+use deque::instruction_enum::{DequeInstruction, MarketEscrowChoice};
 use deque_client::{
     logs::print_size_and_sectors,
     tokens::{generate_deque, INITIAL_MINT_AMOUNT},

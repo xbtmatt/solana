@@ -1,10 +1,10 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+// use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::state::DequeInstruction;
+use crate::instruction_enum::DequeInstruction;
 
 pub mod event_emitter;
 
-#[derive(Debug, Copy, Clone, BorshSerialize, BorshDeserialize)]
-pub enum EmittableEvent {
-    DequeInstruction::Initialize,
-}
+// #[derive(Debug, Copy, Clone, BorshSerialize, BorshDeserialize)]
+// pub enum EmittableEvent {
+//     DequeInstruction::Initialize,
+// }

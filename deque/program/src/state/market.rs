@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use solana_program::pubkey::Pubkey;
 
-use crate::{state::MarketEscrowChoice, PROGRAM_ID_PUBKEY};
+use crate::{instruction_enum::MarketEscrowChoice, PROGRAM_ID_PUBKEY};
 
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 #[repr(C)]

@@ -5,8 +5,9 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
+    instruction_enum::MarketEscrowChoice,
     shared::token_utils::vault_transfers::deposit_to_vault,
-    state::{Deque, DequeNode, MarketEscrow, MarketEscrowChoice},
+    state::{Deque, DequeNode, MarketEscrow},
     utils::{from_sector_idx_mut, inline_resize},
 };
 

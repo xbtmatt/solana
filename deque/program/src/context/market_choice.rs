@@ -4,7 +4,8 @@ use solana_program::{
 };
 
 use crate::{
-    state::{Deque, MarketEscrowChoice},
+    instruction_enum::MarketEscrowChoice,
+    state::Deque,
     utils::check_owned_and_writable,
     validation::token_accounts::{TokenAccountInfo, TokenMintInfo, TokenProgramInfo},
 };

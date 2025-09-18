@@ -1,5 +1,5 @@
 use anyhow::Context;
-use deque::{state::DequeInstruction, PROGRAM_ID_PUBKEY};
+use deque::{instruction_enum::DequeInstruction, PROGRAM_ID_PUBKEY};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
@@ -99,10 +99,10 @@ pub fn send_deposit_or_withdraw(
         _ => panic!("Instruction must be deposit or withdraw."),
     };
 
-    let ixn = Instruction::new_with_borsh(
-        PROGRAM_ID_PUBKEY,
-        deque_instruction,
-        vec![
+    let ixn = Instruction {
+        program_id: PROGRAM_ID_PUBKEY,
+        data: deque_instruction.pack(),
+        accounts: vec![
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new(payer_ata, false),
@@ -111,7 +111,7 @@ pub fn send_deposit_or_withdraw(
             AccountMeta::new(vault_ata, false),
             AccountMeta::new_readonly(system_program::id(), false),
         ],
-    );
+    };
 
     send_txn(rpc, payer, &[payer], vec![ixn], label.to_string());
 

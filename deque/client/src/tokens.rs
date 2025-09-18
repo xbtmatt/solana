@@ -1,16 +1,16 @@
 use anyhow::Context;
 use deque::{
-    state::{get_deque_address, DequeInstruction, MarketEscrowChoice},
+    instruction_enum::{DequeInstruction, MarketEscrowChoice},
+    state::get_deque_address,
     PROGRAM_ID_PUBKEY,
 };
 use solana_client::rpc_client::RpcClient;
-use solana_program::example_mocks::solana_sdk::system_program;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     program_pack::Pack,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
-    system_instruction,
+    system_instruction, system_program,
 };
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Mint;
@@ -118,10 +118,10 @@ impl DequeContext {
     }
 
     pub fn initialize_deque_ixn(&self, payer: &Keypair, num_sectors: u16) -> Instruction {
-        Instruction::new_with_borsh(
-            PROGRAM_ID_PUBKEY,
-            &DequeInstruction::Initialize { num_sectors },
-            vec![
+        Instruction {
+            program_id: PROGRAM_ID_PUBKEY,
+            data: DequeInstruction::Initialize { num_sectors }.pack(),
+            accounts: vec![
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(self.deque_pubkey, false),
                 AccountMeta::new_readonly(self.base_mint, false),
@@ -133,7 +133,7 @@ impl DequeContext {
                 AccountMeta::new_readonly(self.ata_program, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
-        )
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use solana_program::{account_info::AccountInfo, syscalls::MAX_CPI_INSTRUCTION_DATA_LEN};
 
-use crate::state::DequeInstruction;
+use crate::instruction_enum::DequeInstruction;
 
 const MAX_EVENT_SIZE: usize = 96;
 
@@ -22,6 +22,6 @@ impl<'info> EventEmitter<'info> {
             deque_program,
             event_emitter,
         } = emitter_ctx;
-        let mut instruction_data = Vec::with_capacity(MAX_CPI_INSTRUCTION_DATA_LEN as usize);
+        // let mut instruction_data = Vec::with_capacity(MAX_CPI_INSTRUCTION_DATA_LEN as usize);
     }
 }
