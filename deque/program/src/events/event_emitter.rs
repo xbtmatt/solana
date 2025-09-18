@@ -13,7 +13,7 @@ use crate::{
 };
 
 const MAX_CPI_DATA_LEN: usize = MAX_CPI_INSTRUCTION_DATA_LEN as usize;
-const MAX_EVENT_SIZE: usize = 96;
+const MAX_EVENT_SIZE: usize = 10;
 
 pub(crate) struct EventEmitter<'a> {
     emit_instruction: Instruction,
@@ -66,5 +66,21 @@ impl<'info> EventEmitter<'info> {
         // let written = instruction.pack_into_slice(&mut self.emit_instruction.data[start..])?;
         // self.emit_instruction.data.truncate(start + written);
         Ok(())
+    }
+}
+
+pub mod tests {
+
+    #[test]
+    pub fn check_max_event_size() {
+        use crate::{events::event_emitter::MAX_EVENT_SIZE, instruction_enum::DequeInstruction};
+        use strum::IntoEnumIterator;
+
+        let max_size = DequeInstruction::iter()
+            .map(|ixn| ixn.get_size())
+            .max()
+            .expect("Iterator shouldn't be empty");
+
+        assert_eq!(max_size, MAX_EVENT_SIZE);
     }
 }

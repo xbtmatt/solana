@@ -4,7 +4,9 @@ use crate::pack::{unpack_u16, unpack_u64};
 
 #[repr(u8)]
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(Default))]
 pub enum MarketEscrowChoice {
+    #[cfg_attr(test, default)]
     Base,
     Quote,
 }
@@ -32,6 +34,7 @@ impl TryFrom<u8> for MarketEscrowChoice {
 
 #[repr(u8)]
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(test, derive(strum_macros::FromRepr, strum_macros::EnumIter))]
 pub enum DequeInstruction {
     Initialize {
         num_sectors: u16,
@@ -50,7 +53,7 @@ pub enum DequeInstruction {
 }
 
 impl DequeInstruction {
-    pub fn get_size(&self) -> usize {
+    pub const fn get_size(&self) -> usize {
         match self {
             DequeInstruction::Initialize { .. } => 3,
             DequeInstruction::Resize { .. } => 3,
@@ -129,25 +132,11 @@ impl DequeInstruction {
 pub mod tests {
     #[test]
     pub fn check_deque_sizes() {
-        use super::*;
+        use super::DequeInstruction;
+        use strum::IntoEnumIterator;
 
-        let choice = MarketEscrowChoice::Base;
-        let initialize = DequeInstruction::Initialize {
-            num_sectors: u16::MAX,
-        };
-        let resize = DequeInstruction::Resize {
-            num_sectors: u16::MAX,
-        };
-        let deposit = DequeInstruction::Deposit {
-            choice: choice.clone(),
-            amount: u64::MAX,
-        };
-        let withdraw = DequeInstruction::Withdraw { choice };
-        let flush = DequeInstruction::FlushEventLog;
-        assert_eq!(initialize.pack().len(), initialize.get_size());
-        assert_eq!(resize.pack().len(), resize.get_size());
-        assert_eq!(deposit.pack().len(), deposit.get_size());
-        assert_eq!(withdraw.pack().len(), withdraw.get_size());
-        assert_eq!(flush.pack().len(), flush.get_size());
+        for ixn in DequeInstruction::iter() {
+            assert_eq!(ixn.pack().len(), ixn.get_size());
+        }
     }
 }
