@@ -1,4 +1,6 @@
-use solana_program::{msg, program_error::ProgramError};
+use solana_program::program_error::ProgramError;
+
+use crate::pack::{unpack_u16, unpack_u64};
 
 #[repr(u8)]
 #[derive(Clone, Debug, PartialEq)]
@@ -48,8 +50,18 @@ pub enum DequeInstruction {
 }
 
 impl DequeInstruction {
+    pub fn get_size(&self) -> usize {
+        match self {
+            DequeInstruction::Initialize { .. } => 3,
+            DequeInstruction::Resize { .. } => 3,
+            DequeInstruction::Deposit { .. } => 10,
+            DequeInstruction::Withdraw { .. } => 2,
+            DequeInstruction::FlushEventLog => 1,
+        }
+    }
+
     /// Extends a buffer with packed instruction bytes.
-    pub fn pack_into(&self, buf: &mut Vec<u8>) {
+    pub fn pack_into_slice(&self, buf: &mut Vec<u8>) {
         match self {
             Self::Initialize { num_sectors } => {
                 buf.push(0);
@@ -77,10 +89,11 @@ impl DequeInstruction {
     /// More ergonomic but over-allocates memory for ergonomics.
     pub fn pack(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(size_of::<Self>());
-        self.pack_into(&mut buf);
+        self.pack_into_slice(&mut buf);
         buf
     }
 
+    #[inline(always)]
     pub fn unpack(data: &[u8]) -> Result<Self, ProgramError> {
         let (&tag, instruction_data) = data
             .split_first()
@@ -88,7 +101,6 @@ impl DequeInstruction {
 
         Ok(match tag {
             0 => {
-                msg!("ixn data: {:?}", instruction_data);
                 let num_sectors = unpack_u16(instruction_data)?;
                 DequeInstruction::Initialize { num_sectors }
             }
@@ -114,26 +126,28 @@ impl DequeInstruction {
     }
 }
 
-const U16_BYTES: usize = core::mem::size_of::<u16>();
+pub mod tests {
+    #[test]
+    pub fn check_deque_sizes() {
+        use super::*;
 
-#[inline(always)]
-pub fn unpack_u16(instruction_data: &[u8]) -> Result<u16, ProgramError> {
-    if instruction_data.len() >= U16_BYTES {
-        // SAFETY: `instruction_data` is at least `U16_BYTES`.
-        Ok(unsafe { u16::from_le_bytes(*(instruction_data.as_ptr() as *const [u8; U16_BYTES])) })
-    } else {
-        Err(ProgramError::InvalidInstructionData)
-    }
-}
-
-const U64_BYTES: usize = core::mem::size_of::<u64>();
-
-#[inline(always)]
-pub fn unpack_u64(instruction_data: &[u8]) -> Result<u64, ProgramError> {
-    if instruction_data.len() >= U64_BYTES {
-        // SAFETY: `instruction_data` is at least `U64_BYTES`.
-        Ok(unsafe { u64::from_le_bytes(*(instruction_data.as_ptr() as *const [u8; U64_BYTES])) })
-    } else {
-        Err(ProgramError::InvalidInstructionData)
+        let choice = MarketEscrowChoice::Base;
+        let initialize = DequeInstruction::Initialize {
+            num_sectors: u16::MAX,
+        };
+        let resize = DequeInstruction::Resize {
+            num_sectors: u16::MAX,
+        };
+        let deposit = DequeInstruction::Deposit {
+            choice: choice.clone(),
+            amount: u64::MAX,
+        };
+        let withdraw = DequeInstruction::Withdraw { choice };
+        let flush = DequeInstruction::FlushEventLog;
+        assert_eq!(initialize.pack().len(), initialize.get_size());
+        assert_eq!(resize.pack().len(), resize.get_size());
+        assert_eq!(deposit.pack().len(), deposit.get_size());
+        assert_eq!(withdraw.pack().len(), withdraw.get_size());
+        assert_eq!(flush.pack().len(), flush.get_size());
     }
 }

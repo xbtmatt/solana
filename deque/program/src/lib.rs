@@ -8,6 +8,7 @@ pub mod context;
 pub mod events;
 pub mod instruction_enum;
 pub mod instructions;
+pub mod pack;
 pub mod processor;
 pub mod shared;
 pub mod state;

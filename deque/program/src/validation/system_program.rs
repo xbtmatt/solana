@@ -2,7 +2,6 @@ use solana_program::{account_info::AccountInfo, program_error::ProgramError, sys
 
 use crate::require;
 
-/// Represents the system program account.
 #[derive(Clone)]
 pub struct SystemProgramInfo<'a, 'info> {
     pub info: &'a AccountInfo<'info>,

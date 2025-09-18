@@ -2,6 +2,7 @@
 
 // use crate::instruction_enum::DequeInstruction;
 
+pub mod event_authority;
 pub mod event_emitter;
 
 // #[derive(Debug, Copy, Clone, BorshSerialize, BorshDeserialize)]
