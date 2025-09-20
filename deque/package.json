@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "build": "cd program && cargo build-sbf",
+    "deploy": "solana program deploy target/deploy/deque.so || echo 'Make sure the local validator is running'",
+    "examples:escrow": "cargo run --example escrow"
+  }
+}

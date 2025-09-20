@@ -6,7 +6,6 @@ use crate::pack::vec_append_bytes;
 use crate::require;
 use crate::utils::sealed::Sealed;
 
-pub mod event_authority;
 pub(crate) mod event_emitter;
 
 pub trait EmittableEvent: Sealed + Sized {

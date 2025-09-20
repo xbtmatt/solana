@@ -24,7 +24,7 @@ pub struct InitializeDequeContext<'a, 'info> {
     pub quote_token_program: TokenProgramInfo<'a, 'info>,
     pub associated_token_program: AssociatedTokenProgramInfo<'a, 'info>,
     pub system_program: SystemProgramInfo<'a, 'info>,
-    pub deque_bump: u8,
+    pub market_bump: u8,
 }
 
 impl<'a, 'info> InitializeDequeContext<'a, 'info> {
@@ -46,7 +46,7 @@ impl<'a, 'info> InitializeDequeContext<'a, 'info> {
             AssociatedTokenProgramInfo::new_checked(next_account_info(accounts_iter)?)?;
         let system_program = SystemProgramInfo::new_checked(next_account_info(accounts_iter)?)?;
 
-        let deque_bump =
+        let market_bump =
             check_derivations_and_get_bump(deque_account, base_mint.info.key, quote_mint.info.key)?;
 
         Ok(InitializeDequeContext {
@@ -60,7 +60,7 @@ impl<'a, 'info> InitializeDequeContext<'a, 'info> {
             quote_token_program,
             associated_token_program,
             system_program,
-            deque_bump,
+            market_bump,
         })
     }
 }

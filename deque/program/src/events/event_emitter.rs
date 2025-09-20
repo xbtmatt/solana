@@ -10,9 +10,9 @@ use solana_program::{
 
 use crate::{
     context::event_emitter::EventEmitterContext,
-    events::{event_authority, EmittableEvent, EventHeader},
+    events::{EmittableEvent, EventHeader},
     instruction_enum::DequeInstruction,
-    PROGRAM_ID_PUBKEY,
+    seeds,
 };
 
 const MAX_CPI_DATA_LEN: usize = MAX_CPI_INSTRUCTION_DATA_LEN as usize;
@@ -49,7 +49,7 @@ impl<'info> EventEmitter<'info> {
 
         Ok(Self {
             emit_instruction: Instruction {
-                program_id: PROGRAM_ID_PUBKEY,
+                program_id: crate::ID,
                 accounts: vec![AccountMeta::new_readonly(
                     *ctx.event_authority.info.key,
                     true,
@@ -67,7 +67,7 @@ impl<'info> EventEmitter<'info> {
         invoke_signed(
             &self.emit_instruction,
             &self.account_infos,
-            &[event_authority::SEEDS],
+            &[seeds::event_authority::SEEDS],
         )?;
         self.emit_instruction.data.truncate(EVENT_HEADER_SIZE);
         Ok(())

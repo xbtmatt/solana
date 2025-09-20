@@ -1,7 +1,7 @@
 use deque::instruction_enum::{DequeInstruction, MarketEscrowChoice};
 use deque_client::{
     logs::print_size_and_sectors,
-    tokens::{generate_deque, INITIAL_MINT_AMOUNT},
+    tokens::{generate_market, INITIAL_MINT_AMOUNT},
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
 };
 use solana_client::rpc_client::RpcClient;
@@ -23,7 +23,7 @@ async fn main() {
 
 fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
     // ----------------------- Mint two tokens and generate deque address --------------------------
-    let ctx = generate_deque(rpc, payer).expect("Should be able to generate deque");
+    let ctx = generate_market(rpc, payer).expect("Should be able to generate deque");
     let payer_base_ata = get_associated_token_address(&payer.pubkey(), &ctx.base_mint);
     let _payer_quote_ata = get_associated_token_address(&payer.pubkey(), &ctx.quote_mint);
 

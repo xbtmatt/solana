@@ -1,9 +1,7 @@
 use anyhow::Context;
 use deque::{
-    events::event_authority,
     instruction_enum::{DequeInstruction, MarketEscrowChoice},
-    state::get_deque_address,
-    PROGRAM_ID_PUBKEY,
+    seeds,
 };
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
@@ -120,11 +118,11 @@ impl DequeContext {
 
     pub fn initialize_deque_ixn(&self, payer: &Keypair, num_sectors: u16) -> Instruction {
         Instruction {
-            program_id: PROGRAM_ID_PUBKEY,
+            program_id: deque::ID,
             data: DequeInstruction::Initialize { num_sectors }.pack(),
             accounts: vec![
-                AccountMeta::new_readonly(PROGRAM_ID_PUBKEY, false),
-                AccountMeta::new_readonly(event_authority::ID, false),
+                AccountMeta::new_readonly(deque::ID, false),
+                AccountMeta::new_readonly(seeds::event_authority::ID, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(self.deque_pubkey, false),
                 AccountMeta::new_readonly(self.base_mint, false),
@@ -142,12 +140,12 @@ impl DequeContext {
 
 pub const INITIAL_MINT_AMOUNT: u64 = 100000;
 
-pub fn generate_deque(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<DequeContext> {
+pub fn generate_market(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<DequeContext> {
     let (base_mint, _) =
         create_token(rpc, payer, 10, INITIAL_MINT_AMOUNT).context("failed to mint base")?;
     let (quote_mint, _) =
         create_token(rpc, payer, 10, INITIAL_MINT_AMOUNT).context("failed to mint quote")?;
-    let (deque_pubkey, _) = get_deque_address(&base_mint, &quote_mint);
+    let (deque_pubkey, _) = seeds::market::find_market_address(&base_mint, &quote_mint);
 
     // ------------------------------------- Initialization ----------------------------------------
     let (vault_base_ata, vault_quote_ata) = (

@@ -1,5 +1,5 @@
 use anyhow::Context;
-use deque::{events::event_authority, instruction_enum::DequeInstruction, PROGRAM_ID_PUBKEY};
+use deque::{instruction_enum::DequeInstruction, seeds};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
@@ -111,11 +111,11 @@ pub fn send_deposit_or_withdraw(
     };
 
     let ixn = Instruction {
-        program_id: PROGRAM_ID_PUBKEY,
+        program_id: deque::ID,
         data: deque_instruction.pack(),
         accounts: vec![
-            AccountMeta::new_readonly(PROGRAM_ID_PUBKEY, false),
-            AccountMeta::new_readonly(event_authority::ID, false),
+            AccountMeta::new_readonly(deque::ID, false),
+            AccountMeta::new_readonly(seeds::event_authority::ID, false),
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new(payer_ata, false),

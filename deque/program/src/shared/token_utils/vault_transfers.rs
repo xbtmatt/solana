@@ -5,7 +5,7 @@ use solana_program::{
 };
 
 use crate::{
-    context::market_choice::MarketChoiceContext, deque_seeds_with_bump, state::Deque,
+    context::market_choice::MarketChoiceContext, market_seeds_with_bump, state::Deque,
     validation::token_accounts::TokenProgram,
 };
 
@@ -96,7 +96,7 @@ pub fn withdraw_from_vault<'a, 'info>(
                 ctx.payer_ata.info.as_ref().clone(),
                 ctx.deque_account.as_ref().clone(),
             ],
-            deque_seeds_with_bump!(base_mint, quote_mint, deque_bump),
+            market_seeds_with_bump!(base_mint, quote_mint, deque_bump),
         ),
         TokenProgram::SplToken2022 => {
             let mint_decimals = ctx.mint_info.get_decimals();
@@ -117,7 +117,7 @@ pub fn withdraw_from_vault<'a, 'info>(
                     ctx.payer_ata.info.as_ref().clone(),
                     ctx.deque_account.as_ref().clone(),
                 ],
-                deque_seeds_with_bump!(base_mint, quote_mint, deque_bump),
+                market_seeds_with_bump!(base_mint, quote_mint, deque_bump),
             )
         }
     }

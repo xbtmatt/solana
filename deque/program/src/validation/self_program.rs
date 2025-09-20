@@ -1,6 +1,6 @@
 use solana_program::{account_info::AccountInfo, program_error::ProgramError};
 
-use crate::{require, PROGRAM_ID_PUBKEY};
+use crate::require;
 
 #[derive(Clone)]
 pub struct SelfProgramInfo<'a, 'info> {
@@ -12,7 +12,7 @@ impl<'a, 'info> SelfProgramInfo<'a, 'info> {
         info: &'a AccountInfo<'info>,
     ) -> Result<SelfProgramInfo<'a, 'info>, ProgramError> {
         require!(
-            info.key.as_ref() == PROGRAM_ID_PUBKEY.as_ref(),
+            info.key.as_ref() == crate::ID.as_ref(),
             ProgramError::IncorrectProgramId,
             "Invalid self program ID"
         )?;

@@ -4,8 +4,8 @@ use solana_program::{
 };
 
 use crate::{
-    state::{get_deque_address, Deque, DequeNode, MarketEscrow, Stack, HEADER_FIXED_SIZE},
-    PROGRAM_ID_PUBKEY,
+    seeds,
+    state::{Deque, DequeNode, MarketEscrow, Stack, HEADER_FIXED_SIZE},
 };
 
 /// The ordinal `sector` index in the slab of bytes dedicated to inner data for a type.
@@ -88,7 +88,7 @@ pub fn log_bytes(bytes: &[u8]) {
 
 #[inline(always)]
 pub fn check_owned_and_writable(account: &AccountInfo) -> ProgramResult {
-    if account.owner.as_ref() != PROGRAM_ID_PUBKEY.as_ref() {
+    if account.owner.as_ref() != crate::ID.as_ref() {
         msg!("account not owned by program");
         return Err(ProgramError::IncorrectProgramId);
     }
@@ -105,7 +105,9 @@ pub fn check_derivations_and_get_bump(
     base_mint: &Pubkey,
     quote_mint: &Pubkey,
 ) -> Result<u8, ProgramError> {
-    let (deque_pub, deque_bump) = get_deque_address(base_mint, quote_mint);
+    // TODO: Determine if this is necessary. It's possible the bump can be passed and then the
+    // attempted invoke signed should just not work if it's inaccurate..?
+    let (deque_pub, deque_bump) = seeds::market::find_market_address(base_mint, quote_mint);
     if deque_pub.as_ref() != deque_account.key.as_ref() {
         return Err(ProgramError::InvalidAccountData);
     }

@@ -4,11 +4,10 @@ use solana_program::program_error::ProgramError;
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
 
 use crate::context::event_emitter::EventEmitterContext;
-use crate::events::event_authority;
 use crate::events::event_emitter::EventEmitter;
 use crate::instruction_enum::DequeInstruction;
 use crate::utils::log_bytes;
-use crate::{instructions, require};
+use crate::{instructions, require, seeds};
 
 pub fn process_instruction(
     program_id: &Pubkey,
@@ -28,7 +27,7 @@ pub fn process_instruction(
             "Event authority must be a signer"
         )?;
         require!(
-            authority.key.as_ref() == event_authority::ID.as_ref(),
+            authority.key.as_ref() == seeds::event_authority::ID.as_ref(),
             ProgramError::IncorrectAuthority,
             "Invalid event authority"
         )?;

@@ -5,7 +5,7 @@ use solana_program::{
 
 use crate::{
     context::initialize_deque::InitializeDequeContext,
-    deque_seeds_with_bump,
+    market_seeds_with_bump,
     shared::token_utils::create_vault::create_token_vault,
     state::{Deque, HEADER_FIXED_SIZE},
     utils::SECTOR_SIZE,
@@ -33,10 +33,10 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) 
             ctx.deque_account.clone(),
             ctx.system_program.info.clone(),
         ],
-        deque_seeds_with_bump!(
+        market_seeds_with_bump!(
             ctx.base_mint.info.key,
             ctx.quote_mint.info.key,
-            ctx.deque_bump
+            ctx.market_bump
         ),
     )?;
 
@@ -56,7 +56,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) 
         Deque::init_deque_account(
             &mut data,
             num_sectors,
-            ctx.deque_bump,
+            ctx.market_bump,
             ctx.base_mint.info.key,
             ctx.quote_mint.info.key,
         )?;
