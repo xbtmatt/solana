@@ -34,6 +34,8 @@ impl<'info> EventEmitter<'info> {
         // to resizing infrequently
         let mut data = Vec::with_capacity(MAX_CPI_INSTRUCTION_DATA_LEN as usize);
 
+        // TODO: Separate the instruction tag from enum data, use only the tag here.
+        // This will change several other things, too.
         DequeInstruction::FlushEventLog.pack_into_vec(&mut data);
         // TODO: Fill this with meaningful data.
         EventHeader {
