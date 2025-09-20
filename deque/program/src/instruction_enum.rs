@@ -12,7 +12,7 @@ pub enum MarketEscrowChoice {
 }
 
 impl MarketEscrowChoice {
-    fn into(&self) -> u8 {
+    pub fn to_u8(&self) -> u8 {
         match self {
             MarketEscrowChoice::Base => 0,
             MarketEscrowChoice::Quote => 1,
@@ -64,7 +64,7 @@ impl DequeInstruction {
     }
 
     /// Extends a buffer with packed instruction bytes.
-    pub fn pack_into_slice(&self, buf: &mut Vec<u8>) {
+    pub fn pack_into_vec(&self, buf: &mut Vec<u8>) {
         match self {
             Self::Initialize { num_sectors } => {
                 buf.push(0);
@@ -76,12 +76,12 @@ impl DequeInstruction {
             }
             Self::Deposit { ref choice, amount } => {
                 buf.push(2);
-                buf.push(choice.into());
+                buf.push(choice.to_u8());
                 buf.extend_from_slice(&amount.to_le_bytes());
             }
             Self::Withdraw { ref choice } => {
                 buf.push(3);
-                buf.push(choice.into());
+                buf.push(choice.to_u8());
             }
             Self::FlushEventLog => {
                 buf.push(4);
@@ -89,10 +89,10 @@ impl DequeInstruction {
         }
     }
 
-    /// More ergonomic but over-allocates memory for ergonomics.
+    /// More ergonomic but over-allocates memory.
     pub fn pack(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(size_of::<Self>());
-        self.pack_into_slice(&mut buf);
+        let mut buf = Vec::with_capacity(self.get_size());
+        self.pack_into_vec(&mut buf);
         buf
     }
 
@@ -124,6 +124,7 @@ impl DequeInstruction {
             3 => DequeInstruction::Withdraw {
                 choice: MarketEscrowChoice::try_from(instruction_data[0])?,
             },
+            4 => DequeInstruction::FlushEventLog,
             _ => return Err(ProgramError::InvalidInstructionData),
         })
     }

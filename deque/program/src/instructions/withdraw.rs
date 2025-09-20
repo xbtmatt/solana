@@ -5,6 +5,7 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
+    events::{event_emitter::EventEmitter, WithdrawEvent},
     instruction_enum::MarketEscrowChoice,
     shared::token_utils::vault_transfers::withdraw_from_vault,
     state::{Deque, MarketEscrow},
@@ -14,6 +15,7 @@ pub fn process(
     _program_id: &Pubkey,
     accounts: &[AccountInfo],
     choice: MarketEscrowChoice,
+    event_emitter: &mut EventEmitter,
 ) -> ProgramResult {
     let ctx = MarketChoiceContext::load(accounts, choice)?;
 
@@ -36,7 +38,7 @@ pub fn process(
     // Drop the deque account data ref so it's possible to call transfer.
     drop(data);
 
-    match escrow_and_idx {
+    let amount = match escrow_and_idx {
         Some((escrow, idx)) => {
             let amount = escrow.amount_from_choice(&ctx.choice);
             withdraw_from_vault(&ctx, amount)?;
@@ -49,12 +51,20 @@ pub fn process(
                 .remove::<MarketEscrow>(idx)
                 .map_err(|_| ProgramError::InvalidAccountData)?;
             msg!("Withdrawing {} coins", amount);
+
+            amount
         }
         None => {
             msg!("Trader has no active escrow");
             return Err(ProgramError::InvalidArgument);
         }
-    }
+    };
+
+    event_emitter.add_event(WithdrawEvent {
+        trader: ctx.payer.key,
+        amount,
+        side: ctx.choice,
+    })?;
 
     Ok(())
 }

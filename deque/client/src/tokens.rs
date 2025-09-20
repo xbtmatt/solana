@@ -1,5 +1,6 @@
 use anyhow::Context;
 use deque::{
+    events::event_authority,
     instruction_enum::{DequeInstruction, MarketEscrowChoice},
     state::get_deque_address,
     PROGRAM_ID_PUBKEY,
@@ -122,6 +123,8 @@ impl DequeContext {
             program_id: PROGRAM_ID_PUBKEY,
             data: DequeInstruction::Initialize { num_sectors }.pack(),
             accounts: vec![
+                AccountMeta::new_readonly(PROGRAM_ID_PUBKEY, false),
+                AccountMeta::new_readonly(event_authority::ID, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(self.deque_pubkey, false),
                 AccountMeta::new_readonly(self.base_mint, false),

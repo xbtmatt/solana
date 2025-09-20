@@ -12,7 +12,7 @@ impl<'a, 'info> EventAuthorityInfo<'a, 'info> {
         info: &'a AccountInfo<'info>,
     ) -> Result<EventAuthorityInfo<'a, 'info>, ProgramError> {
         require!(
-            info.key.as_ref() == event_authority::PDA.as_ref(),
+            info.key.as_ref() == event_authority::ID.as_ref(),
             ProgramError::IncorrectAuthority,
             "Invalid event authority"
         )?;

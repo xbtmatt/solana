@@ -1,7 +1,8 @@
 use anyhow::Context;
-use deque::{instruction_enum::DequeInstruction, PROGRAM_ID_PUBKEY};
+use deque::{events::event_authority, instruction_enum::DequeInstruction, PROGRAM_ID_PUBKEY};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
+    compute_budget::ComputeBudgetInstruction,
     instruction::{AccountMeta, Instruction},
     message::Message,
     pubkey::Pubkey,
@@ -48,7 +49,17 @@ pub fn send_txn(
         .get_latest_blockhash()
         .or(Err(()))
         .expect("Should be able to get blockhash.");
-    let msg = Message::new(&ixns, Some(&payer.pubkey()));
+    let msg = Message::new(
+        &[
+            vec![
+                ComputeBudgetInstruction::set_compute_unit_limit(1_000_000),
+                ComputeBudgetInstruction::set_compute_unit_price(1),
+            ],
+            ixns,
+        ]
+        .concat(),
+        Some(&payer.pubkey()),
+    );
     let mut tx = Transaction::new_unsigned(msg);
     tx.try_sign(
         &[std::iter::once(payer)
@@ -103,6 +114,8 @@ pub fn send_deposit_or_withdraw(
         program_id: PROGRAM_ID_PUBKEY,
         data: deque_instruction.pack(),
         accounts: vec![
+            AccountMeta::new_readonly(PROGRAM_ID_PUBKEY, false),
+            AccountMeta::new_readonly(event_authority::ID, false),
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new(payer_ata, false),

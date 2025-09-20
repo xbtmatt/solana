@@ -5,6 +5,7 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
+    events::{event_emitter::EventEmitter, DepositEvent},
     instruction_enum::MarketEscrowChoice,
     shared::token_utils::vault_transfers::deposit_to_vault,
     state::{Deque, DequeNode, MarketEscrow},
@@ -16,6 +17,7 @@ pub fn process(
     accounts: &[AccountInfo],
     amount_in: u64,
     choice: MarketEscrowChoice,
+    event_emitter: &mut EventEmitter,
 ) -> ProgramResult {
     let ctx = MarketChoiceContext::load(accounts, choice)?;
 
@@ -85,6 +87,12 @@ pub fn process(
                 .map_err(|_| ProgramError::InvalidAccountData)?;
         }
     }
+
+    event_emitter.add_event(DepositEvent {
+        trader: ctx.payer.key,
+        amount,
+        side: choice,
+    })?;
 
     Ok(())
 }

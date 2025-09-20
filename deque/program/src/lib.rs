@@ -12,10 +12,11 @@ pub mod pack;
 pub mod processor;
 pub mod shared;
 pub mod state;
+pub(crate) mod syscalls;
 pub mod utils;
 pub mod validation;
 
-pub const PROGRAM_ID_STR: &str = "9SM4HUDDWsKDs9wCkfdGwkfDtUL9WwXUnmqdwNnZTzBW";
+pub const PROGRAM_ID_STR: &str = "4o8MdmWKP5FzAacZsj4QboX7rkUQbmMp87MBwdqarHtb";
 pub const PROGRAM_ID_PUBKEY: Pubkey = Pubkey::from_str_const(PROGRAM_ID_STR);
 
 declare_id!(PROGRAM_ID_STR);

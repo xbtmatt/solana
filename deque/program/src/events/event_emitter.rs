@@ -4,42 +4,59 @@ use solana_program::{
     instruction::{AccountMeta, Instruction},
     program::invoke_signed,
     program_error::ProgramError,
+    pubkey::Pubkey,
     syscalls::MAX_CPI_INSTRUCTION_DATA_LEN,
 };
 
 use crate::{
-    events::event_authority, instruction_enum::DequeInstruction,
-    validation::self_program::SelfProgramInfo, PROGRAM_ID_PUBKEY,
+    context::event_emitter::EventEmitterContext,
+    events::{event_authority, EmittableEvent, EventHeader},
+    instruction_enum::DequeInstruction,
+    PROGRAM_ID_PUBKEY,
 };
 
 const MAX_CPI_DATA_LEN: usize = MAX_CPI_INSTRUCTION_DATA_LEN as usize;
-const MAX_EVENT_SIZE: usize = 10;
+const EVENT_HEADER_SIZE: usize = 76;
 
-pub(crate) struct EventEmitter<'a> {
+pub struct EventEmitter<'a> {
     emit_instruction: Instruction,
     account_infos: [AccountInfo<'a>; 2],
-    scratch_buffer: [u8; MAX_EVENT_SIZE],
 }
 
 impl<'info> EventEmitter<'info> {
-    pub fn new<'a>(
-        deque_program: SelfProgramInfo<'a, 'info>,
-        event_authority: SelfProgramInfo<'a, 'info>,
-        deque_instruction: DequeInstruction,
+    pub(crate) fn new<'a>(
+        ctx: EventEmitterContext<'a, 'info>,
+        market: &Pubkey,
+        sender: &Pubkey,
+        instruction_tag: u8,
     ) -> Result<Self, ProgramError> {
-        let mut instruction_data = Vec::with_capacity(MAX_CPI_INSTRUCTION_DATA_LEN as usize);
-        deque_instruction.pack_into_slice(&mut instruction_data);
+        // TODO: benchmark the cost of allocating the full max CPI data length up front as opposed
+        // to resizing infrequently
+        let mut data = Vec::with_capacity(MAX_CPI_INSTRUCTION_DATA_LEN as usize);
+
+        DequeInstruction::FlushEventLog.pack_into_vec(&mut data);
+        // TODO: Fill this with meaningful data.
+        EventHeader {
+            market,
+            sender,
+            instruction: instruction_tag,
+            nonce: 1,
+            emitted_count: 10,
+        }
+        .write(&mut data)?;
 
         Ok(Self {
             emit_instruction: Instruction {
                 program_id: PROGRAM_ID_PUBKEY,
-                accounts: vec![AccountMeta::new_readonly(*event_authority.info.key, true)],
-                data: instruction_data,
+                accounts: vec![AccountMeta::new_readonly(
+                    *ctx.event_authority.info.key,
+                    true,
+                )],
+                data,
             },
-            scratch_buffer: [0; MAX_EVENT_SIZE],
             account_infos: [
-                deque_program.info.as_ref().clone(),
-                event_authority.info.as_ref().clone(),
+                ctx.self_program.info.as_ref().clone(),
+                ctx.event_authority.info.as_ref().clone(),
             ],
         })
     }
@@ -48,39 +65,20 @@ impl<'info> EventEmitter<'info> {
         invoke_signed(
             &self.emit_instruction,
             &self.account_infos,
-            &[event_authority::SEEDS, &[&[event_authority::BUMP]]],
+            &[event_authority::SEEDS],
         )?;
+        self.emit_instruction.data.truncate(EVENT_HEADER_SIZE);
         Ok(())
     }
 
-    pub fn add_to_buffer(&mut self, instruction: DequeInstruction) -> ProgramResult {
+    pub fn add_event<Event: EmittableEvent>(&mut self, event: Event) -> ProgramResult {
         // TODO: Add an `index` field to all events to track order.
 
-        // Conservative check on the emit ixn data size; assume the event will be MAX_EVENT_SIZE.
-        if self.emit_instruction.data.len() + instruction.get_size() > MAX_CPI_DATA_LEN {
+        if self.emit_instruction.data.len() + Event::LEN > MAX_CPI_DATA_LEN {
             self.flush()?;
         }
 
-        let start = self.emit_instruction.data.len();
-        self.emit_instruction.data.resize(start + MAX_EVENT_SIZE, 0);
-        // let written = instruction.pack_into_slice(&mut self.emit_instruction.data[start..])?;
-        // self.emit_instruction.data.truncate(start + written);
+        event.write(&mut self.emit_instruction.data)?;
         Ok(())
-    }
-}
-
-pub mod tests {
-
-    #[test]
-    pub fn check_max_event_size() {
-        use crate::{events::event_emitter::MAX_EVENT_SIZE, instruction_enum::DequeInstruction};
-        use strum::IntoEnumIterator;
-
-        let max_size = DequeInstruction::iter()
-            .map(|ixn| ixn.get_size())
-            .max()
-            .expect("Iterator shouldn't be empty");
-
-        assert_eq!(max_size, MAX_EVENT_SIZE);
     }
 }

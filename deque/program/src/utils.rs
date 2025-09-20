@@ -166,3 +166,7 @@ pub fn inline_resize<'a, 'info>(
 
     Ok(())
 }
+
+pub(crate) mod sealed {
+    pub trait Sealed {}
+}
