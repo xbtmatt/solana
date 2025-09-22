@@ -96,7 +96,7 @@ pub fn send_deposit_or_withdraw(
     mint: Pubkey,
     vault_ata: Pubkey,
     deque_instruction: &DequeInstruction,
-) -> Result<Signature, ClientError> {
+) -> Result<ParsedTransaction, ClientError> {
     println!(
         "BEFORE: payer, vault: ({}, {})",
         get_token_balance(rpc, &payer.pubkey(), &mint),

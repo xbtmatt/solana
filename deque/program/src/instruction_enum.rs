@@ -78,8 +78,8 @@ impl TryFrom<u8> for InstructionTag {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: A valid enum variant is guaranteed with the match pattern.
-            0..5 => Ok(unsafe { core::mem::transmute::<u8, InstructionTag>(value) }),
-            _ => Err(ProgramError::InvalidInstructionData),
+            0..5 => Ok(unsafe { core::mem::transmute::<u8, Self>(value) }),
+            _ => Err(DequeError::InvalidDiscriminant.into()),
         }
     }
 }
@@ -98,7 +98,7 @@ impl Pack<3> for InitializeInstructionData {
     }
 
     #[inline(always)]
-    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+    unsafe fn unpack_unchecked(instruction_data: &[u8]) -> Self {
         // SAFETY: Caller guarantees instruction data has at least 2 bytes at offset 1.
         Self {
             num_sectors: u16::from_le_bytes(unsafe {
@@ -122,7 +122,7 @@ impl Pack<3> for ResizeInstructionData {
     }
 
     #[inline(always)]
-    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+    unsafe fn unpack_unchecked(instruction_data: &[u8]) -> Self {
         // SAFETY: Caller guarantees instruction data has at least 2 bytes at offset 1.
         let num_sectors = u16::from_le_bytes(unsafe {
             *(instruction_data.get_unchecked(1..3).as_ptr() as *const [u8; U16_BYTES])
@@ -157,11 +157,12 @@ impl Pack<10> for DepositInstructionData {
             MarketChoice::try_from(unsafe { *(data.get_unchecked(1)) }).is_ok(),
             DequeError::InvalidMarketChoice
         )?;
-        Ok(Self::unpack_unchecked(data))
+        // Safety: The length, tag, and choice enum were all just verified.
+        Ok(unsafe { Self::unpack_unchecked(data) })
     }
 
     #[inline(always)]
-    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+    unsafe fn unpack_unchecked(instruction_data: &[u8]) -> Self {
         // SAFETY: Caller guarantees instruction data has 1 byte at offset 1.
         let choice_byte = unsafe { *(instruction_data.get_unchecked(1)) };
         // SAFETY: Caller must ensure that that byte is either 0 or 1.
@@ -188,7 +189,7 @@ impl Pack<2> for WithdrawInstructionData {
     }
 
     #[inline(always)]
-    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+    unsafe fn unpack_unchecked(instruction_data: &[u8]) -> Self {
         // SAFETY: Caller guarantees instruction data has 1 byte at offset 1.
         let choice_byte = unsafe { *(instruction_data.get_unchecked(1)) };
         // SAFETY: Caller must ensure that that byte is either 0 or 1.
@@ -208,7 +209,7 @@ impl Pack<1> for FlushEventLogInstructionData {
     }
 
     #[inline(always)]
-    fn unpack_unchecked(_instruction_data: &[u8]) -> Self {
+    unsafe fn unpack_unchecked(_instruction_data: &[u8]) -> Self {
         Self {}
     }
 }

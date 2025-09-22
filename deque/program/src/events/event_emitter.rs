@@ -10,7 +10,7 @@ use solana_program::{
 
 use crate::{
     context::event_emitter::EventEmitterContext,
-    events::{EmittableEvent, EventHeader},
+    events::{EmittableEvent, HeaderEventData},
     instruction_enum::InstructionTag,
     seeds,
 };
@@ -19,8 +19,8 @@ const MAX_CPI_DATA_LEN: usize = MAX_CPI_INSTRUCTION_DATA_LEN as usize;
 const EVENT_HEADER_SIZE: usize = 76;
 
 pub struct EventEmitter<'a> {
-    emit_instruction: Instruction,
-    account_infos: [AccountInfo<'a>; 2],
+    pub emit_instruction: Instruction,
+    pub account_infos: [AccountInfo<'a>; 2],
 }
 
 impl<'info> EventEmitter<'info> {
@@ -42,7 +42,7 @@ impl<'info> EventEmitter<'info> {
         }
 
         // TODO: Fill this with meaningful data.
-        EventHeader::new(instruction_tag, market, sender, 1, 10).write(&mut data)?;
+        HeaderEventData::new(instruction_tag, market, sender, 1, 10).write(&mut data)?;
 
         Ok(Self {
             emit_instruction: Instruction {
@@ -70,10 +70,10 @@ impl<'info> EventEmitter<'info> {
         Ok(())
     }
 
-    pub fn add_event<Event: EmittableEvent>(&mut self, event: Event) -> ProgramResult {
+    pub fn add_event<T: EmittableEvent>(&mut self, event: T) -> ProgramResult {
         // TODO: Add an `index` field to all events to track order.
 
-        if self.emit_instruction.data.len() + Event::LEN > MAX_CPI_DATA_LEN {
+        if self.emit_instruction.data.len() + T::LEN > MAX_CPI_DATA_LEN {
             self.flush()?;
         }
 

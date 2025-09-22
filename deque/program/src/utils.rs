@@ -171,10 +171,6 @@ pub fn inline_resize<'a, 'info>(
     Ok(())
 }
 
-pub(crate) mod sealed {
-    pub trait Sealed {}
-}
-
 pub const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::uninit();
 
 /// A byte-by-byte copy from one slice to another without having to zero init on the `dst` slice.

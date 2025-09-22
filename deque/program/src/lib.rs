@@ -18,6 +18,6 @@ pub(crate) mod syscalls;
 pub mod utils;
 pub mod validation;
 
-declare_id!("9SM4HUDDWsKDs9wCkfdGwkfDtUL9WwXUnmqdwNnZTzBW");
+declare_id!("4o8MdmWKP5FzAacZsj4QboX7rkUQbmMp87MBwdqarHtb");
 
 entrypoint!(process_instruction);

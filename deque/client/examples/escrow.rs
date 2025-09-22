@@ -2,6 +2,7 @@ use deque::instruction_enum::{
     DepositInstructionData, DequeInstruction, MarketChoice, WithdrawInstructionData,
 };
 use deque_client::{
+    events::parse_txn,
     logs::print_size_and_sectors,
     tokens::{generate_market, INITIAL_MINT_AMOUNT},
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
@@ -62,7 +63,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             choice: MarketChoice::Base,
         }),
     )
-    .and_then(parse_txn)?;
+    .map(parse_txn);
 
     // ----------------------------------------- Withdraw -------------------------------------------
     send_deposit_or_withdraw(
@@ -76,7 +77,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             choice: MarketChoice::Base,
         }),
     )
-    .and_then(parse_txn)?;
+    .map(parse_txn);
 
     // ------------------------------------------- Fuzz --------------------------------------------
     const ROUNDS: u64 = 10;

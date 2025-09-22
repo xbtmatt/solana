@@ -12,16 +12,18 @@ pub trait Pack<const LEN: usize>: Sized {
     fn pack(&self) -> [u8; LEN] {
         let mut dst = [UNINIT_BYTE; LEN];
         self.pack_into_slice(&mut dst);
-        // Safety: All bytes are initialized in `pack_into_slice`.
+        // Safety: All LEN bytes were initialized in `pack_into_slice`.
         unsafe { *(dst.as_ptr() as *const [u8; LEN]) }
     }
 
+    #[doc(hidden)]
     fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; LEN]);
 
     #[inline(always)]
     fn unpack(data: &[u8]) -> Result<Self, ProgramError> {
         Self::check_len(data)?;
-        Ok(Self::unpack_unchecked(data))
+        // Safety: The length was just checked.
+        Ok(unsafe { Self::unpack_unchecked(data) })
     }
 
     #[inline(always)]
@@ -29,7 +31,10 @@ pub trait Pack<const LEN: usize>: Sized {
         require!(data.len() >= LEN, DequeError::InvalidPackedData)
     }
 
-    fn unpack_unchecked(instruction_data: &[u8]) -> Self;
+    /// # Safety:
+    /// The length of the instruction data must be verified before calling this.
+    #[doc(hidden)]
+    unsafe fn unpack_unchecked(instruction_data: &[u8]) -> Self;
 }
 
 pub trait Discriminant {
@@ -50,7 +55,8 @@ pub trait PackWithDiscriminant<const LEN: usize>: Pack<LEN> + Discriminant {
     fn unpack_checked_tag(data: &[u8]) -> Result<Self, ProgramError> {
         Self::check_len(data)?;
         Self::check_tag(data)?;
-        Ok(Self::unpack_unchecked(data))
+        // Safety: The length of the data and validity of the tag were just verified.
+        Ok(unsafe { Self::unpack_unchecked(data) })
     }
 }
 

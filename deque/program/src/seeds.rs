@@ -4,7 +4,7 @@ pub mod event_authority {
     pub const SEEDS: &[&[u8]] = &[b"event_authority", &[BUMP]];
 
     /// Regenerate with `print_pda` helper below if the program ID changes.
-    pub const ID: Pubkey = Pubkey::from_str_const("ADmPhmSFi6MHDTFTX2pB7x92WNuhNHXJWU438Lpz4KNe");
+    pub const ID: Pubkey = Pubkey::from_str_const("cwEgVDNTb5vMaQWuUcNpr9D3ZXLFYnSCFE6Zkt5FDSN");
 
     /// Regenerate with `print_pda` helper below if the program ID changes.
     pub const BUMP: u8 = 255;

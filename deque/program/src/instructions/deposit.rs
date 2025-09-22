@@ -5,7 +5,7 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
-    events::{event_emitter::EventEmitter, DepositEvent},
+    events::{event_emitter::EventEmitter, DepositEventData},
     instruction_enum::MarketChoice,
     shared::token_utils::vault_transfers::deposit_to_vault,
     state::{Deque, DequeNode, MarketEscrow},
@@ -88,11 +88,7 @@ pub fn process(
         }
     }
 
-    event_emitter.add_event(DepositEvent {
-        trader: ctx.payer.key,
-        amount,
-        side: choice,
-    })?;
+    event_emitter.add_event(DepositEventData::new(ctx.payer.key, amount, choice))?;
 
     Ok(())
 }

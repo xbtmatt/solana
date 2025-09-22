@@ -1,6 +1,6 @@
-use deque::events::EmittableEvent;
+use deque::events::DequeEvent;
 use solana_sdk::signature::Signature;
 
-pub fn parse_events<T: EmittableEvent>(sig: &Signature, events: Vec<Vec<u8>>) -> Vec<T> {
+pub fn parse_txn(sig: Signature) -> Vec<DequeEvent<'static>> {
     vec![]
 }

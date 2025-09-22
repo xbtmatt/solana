@@ -36,6 +36,7 @@ pub enum DequeError {
     InvalidPackedData,
     InvalidMarketChoice,
     InvalidNumberOfAccounts,
+    InsufficientVecCapacity,
 }
 
 impl From<DequeError> for ProgramError {
@@ -51,6 +52,7 @@ impl From<DequeError> for &'static str {
             DequeError::InvalidPackedData => "Invalid packed data",
             DequeError::InvalidMarketChoice => "Invalid market choice",
             DequeError::InvalidNumberOfAccounts => "Invalid number of accounts passed",
+            DequeError::InsufficientVecCapacity => "Insufficient vec.capacity()",
         }
     }
 }

@@ -5,7 +5,7 @@ use solana_program::{
 
 use crate::{
     context::market_choice::MarketChoiceContext,
-    events::{event_emitter::EventEmitter, WithdrawEvent},
+    events::{event_emitter::EventEmitter, WithdrawEventData},
     instruction_enum::MarketChoice,
     shared::token_utils::vault_transfers::withdraw_from_vault,
     state::{Deque, MarketEscrow},
@@ -60,11 +60,7 @@ pub fn process(
         }
     };
 
-    event_emitter.add_event(WithdrawEvent {
-        trader: ctx.payer.key,
-        amount,
-        side: ctx.choice,
-    })?;
+    event_emitter.add_event(WithdrawEventData::new(ctx.payer.key, amount, ctx.choice))?;
 
     Ok(())
 }
