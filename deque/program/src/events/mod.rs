@@ -1,7 +1,7 @@
 use solana_program::program_error::ProgramError;
 use solana_program::{entrypoint::ProgramResult, pubkey::Pubkey};
 
-use crate::instruction_enum::MarketEscrowChoice;
+use crate::instruction_enum::{InstructionTag, MarketChoice};
 use crate::pack::vec_append_bytes;
 use crate::require;
 use crate::utils::sealed::Sealed;
@@ -9,6 +9,8 @@ use crate::utils::sealed::Sealed;
 pub(crate) mod event_emitter;
 
 pub trait EmittableEvent: Sealed + Sized {
+    const DISCRIMINANT: u8;
+
     const LEN: usize;
 
     /// Writes the event bytes to a destination buffer, checking that it has enough spare capacity.
@@ -35,9 +37,10 @@ pub trait EmittableEvent: Sealed + Sized {
 }
 
 pub struct EventHeader<'p> {
+    pub discriminant: u8,
+    pub instruction_tag: u8,
     pub market: &'p Pubkey,
     pub sender: &'p Pubkey,
-    pub instruction: u8,
     pub nonce: u64,
     pub emitted_count: u16,
 }
@@ -45,12 +48,15 @@ pub struct EventHeader<'p> {
 impl Sealed for EventHeader<'_> {}
 
 impl EmittableEvent for EventHeader<'_> {
-    const LEN: usize = 32 + 32 + 1 + 8 + 2;
+    const DISCRIMINANT: u8 = 0;
+
+    const LEN: usize = 1 + 1 + 32 + 32 + 8 + 2;
 
     unsafe fn write_unchecked(&self, buf: &mut Vec<u8>) {
+        vec_append_bytes(buf, &[Self::DISCRIMINANT]);
+        vec_append_bytes(buf, &[self.instruction_tag]);
         vec_append_bytes(buf, self.market.as_ref());
         vec_append_bytes(buf, self.sender.as_ref());
-        vec_append_bytes(buf, &[self.instruction]);
         vec_append_bytes(buf, &self.nonce.to_le_bytes());
         vec_append_bytes(buf, &self.emitted_count.to_le_bytes());
     }
@@ -61,21 +67,43 @@ impl EmittableEvent for EventHeader<'_> {
     }
 }
 
+impl<'p> EventHeader<'p> {
+    fn new(
+        instruction_tag: InstructionTag,
+        market: &'p Pubkey,
+        sender: &'p Pubkey,
+        nonce: u64,
+        emitted_count: u16,
+    ) -> Self {
+        EventHeader {
+            market,
+            discriminant: Self::DISCRIMINANT,
+            instruction_tag: instruction_tag as u8,
+            sender,
+            nonce,
+            emitted_count,
+        }
+    }
+}
+
 pub struct DepositEvent<'p> {
     pub trader: &'p Pubkey,
     pub amount: u64,
-    pub side: MarketEscrowChoice,
+    pub side: MarketChoice,
 }
 
 impl Sealed for DepositEvent<'_> {}
 
 impl EmittableEvent for DepositEvent<'_> {
-    const LEN: usize = 32 + 8;
+    const DISCRIMINANT: u8 = 1;
+
+    const LEN: usize = 1 + 1 + 32 + 8;
 
     unsafe fn write_unchecked(&self, buf: &mut Vec<u8>) {
+        vec_append_bytes(buf, &[Self::DISCRIMINANT]);
         vec_append_bytes(buf, self.trader.as_ref());
         vec_append_bytes(buf, &self.amount.to_le_bytes());
-        vec_append_bytes(buf, &[self.side.to_u8()]);
+        vec_append_bytes(buf, &[self.side as u8]);
     }
 
     #[cfg(feature = "client")]
@@ -88,18 +116,21 @@ impl EmittableEvent for DepositEvent<'_> {
 pub struct WithdrawEvent<'p> {
     pub trader: &'p Pubkey,
     pub amount: u64,
-    pub side: MarketEscrowChoice,
+    pub side: MarketChoice,
 }
 
 impl Sealed for WithdrawEvent<'_> {}
 
 impl EmittableEvent for WithdrawEvent<'_> {
+    const DISCRIMINANT: u8 = 2;
+
     const LEN: usize = 32 + 8;
 
     unsafe fn write_unchecked(&self, buf: &mut Vec<u8>) {
+        vec_append_bytes(buf, &[Self::DISCRIMINANT]);
         vec_append_bytes(buf, self.trader.as_ref());
         vec_append_bytes(buf, &self.amount.to_le_bytes());
-        vec_append_bytes(buf, &[self.side.to_u8()]);
+        vec_append_bytes(buf, &[self.side as u8]);
     }
 
     #[cfg(feature = "client")]

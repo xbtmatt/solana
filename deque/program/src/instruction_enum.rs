@@ -1,143 +1,232 @@
+use core::mem::MaybeUninit;
+
+use crate::pack::Discriminant;
 use solana_program::program_error::ProgramError;
 
-use crate::pack::{unpack_u16, unpack_u64};
+use crate::{
+    impl_discriminants,
+    pack::{Pack, PackWithDiscriminant, U16_BYTES},
+    require,
+    shared::error::DequeError,
+    utils::write_bytes,
+};
 
 #[repr(u8)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(test, derive(Default))]
-pub enum MarketEscrowChoice {
+pub enum MarketChoice {
     #[cfg_attr(test, default)]
     Base,
     Quote,
 }
 
-impl MarketEscrowChoice {
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            MarketEscrowChoice::Base => 0,
-            MarketEscrowChoice::Quote => 1,
-        }
-    }
-}
-
-impl TryFrom<u8> for MarketEscrowChoice {
+impl TryFrom<u8> for MarketChoice {
     type Error = ProgramError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: A valid enum variant is guaranteed with the match pattern.
-            0..=1 => Ok(unsafe { core::mem::transmute::<u8, MarketEscrowChoice>(value) }),
+            0..=1 => Ok(unsafe { core::mem::transmute::<u8, MarketChoice>(value) }),
             _ => Err(ProgramError::InvalidInstructionData),
         }
     }
 }
 
 #[repr(u8)]
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(strum_macros::FromRepr, strum_macros::EnumIter))]
-pub enum DequeInstruction {
-    Initialize {
-        num_sectors: u16,
-    } = 0,
-    Resize {
-        num_sectors: u16,
-    } = 1,
-    Deposit {
-        choice: MarketEscrowChoice,
-        amount: u64,
-    } = 2,
-    Withdraw {
-        choice: MarketEscrowChoice,
-    } = 3,
-    FlushEventLog = 4,
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum InstructionTag {
+    Initialize,
+    Resize,
+    Deposit,
+    Withdraw,
+    FlushEventLog,
 }
 
+impl_discriminants! {
+    InitializeInstructionData    => InstructionTag::Initialize,
+    DepositInstructionData       => InstructionTag::Deposit,
+    WithdrawInstructionData      => InstructionTag::Withdraw,
+    ResizeInstructionData        => InstructionTag::Resize,
+    FlushEventLogInstructionData => InstructionTag::FlushEventLog,
+}
+
+#[cfg(not(target_os = "solana"))]
+pub enum DequeInstruction {
+    Initialize(InitializeInstructionData),
+    Deposit(DepositInstructionData),
+    Withdraw(WithdrawInstructionData),
+    Resize(ResizeInstructionData),
+    FlushEventLog(FlushEventLogInstructionData),
+}
+
+#[cfg(not(target_os = "solana"))]
 impl DequeInstruction {
-    pub const fn get_size(&self) -> usize {
-        match self {
-            DequeInstruction::Initialize { .. } => 3,
-            DequeInstruction::Resize { .. } => 3,
-            DequeInstruction::Deposit { .. } => 10,
-            DequeInstruction::Withdraw { .. } => 2,
-            DequeInstruction::FlushEventLog => 1,
-        }
-    }
-
-    /// Extends a buffer with packed instruction bytes.
-    pub fn pack_into_vec(&self, buf: &mut Vec<u8>) {
-        match self {
-            Self::Initialize { num_sectors } => {
-                buf.push(0);
-                buf.extend_from_slice(&num_sectors.to_le_bytes());
-            }
-            Self::Resize { num_sectors } => {
-                buf.push(1);
-                buf.extend_from_slice(&num_sectors.to_le_bytes());
-            }
-            Self::Deposit { ref choice, amount } => {
-                buf.push(2);
-                buf.push(choice.to_u8());
-                buf.extend_from_slice(&amount.to_le_bytes());
-            }
-            Self::Withdraw { ref choice } => {
-                buf.push(3);
-                buf.push(choice.to_u8());
-            }
-            Self::FlushEventLog => {
-                buf.push(4);
-            }
-        }
-    }
-
-    /// More ergonomic but over-allocates memory.
     pub fn pack(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(self.get_size());
-        self.pack_into_vec(&mut buf);
-        buf
+        match self {
+            DequeInstruction::Initialize(data) => data.pack().to_vec(),
+            DequeInstruction::Deposit(data) => data.pack().to_vec(),
+            DequeInstruction::Withdraw(data) => data.pack().to_vec(),
+            DequeInstruction::Resize(data) => data.pack().to_vec(),
+            DequeInstruction::FlushEventLog(data) => data.pack().to_vec(),
+        }
+    }
+}
+
+impl TryFrom<u8> for InstructionTag {
+    type Error = ProgramError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            // SAFETY: A valid enum variant is guaranteed with the match pattern.
+            0..5 => Ok(unsafe { core::mem::transmute::<u8, InstructionTag>(value) }),
+            _ => Err(ProgramError::InvalidInstructionData),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct InitializeInstructionData {
+    pub num_sectors: u16,
+}
+
+impl Pack<3> for InitializeInstructionData {
+    #[inline(always)]
+    fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 3]) {
+        dst[0].write(Self::TAG);
+        write_bytes(&mut dst[1..3], &self.num_sectors.to_le_bytes());
     }
 
     #[inline(always)]
-    pub fn unpack(data: &[u8]) -> Result<Self, ProgramError> {
-        let (&tag, instruction_data) = data
-            .split_first()
-            .ok_or(ProgramError::InvalidInstructionData)?;
+    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+        // SAFETY: Caller guarantees instruction data has at least 2 bytes at offset 1.
+        Self {
+            num_sectors: u16::from_le_bytes(unsafe {
+                *(instruction_data.get_unchecked(1..3).as_ptr() as *const [u8; U16_BYTES])
+            }),
+        }
+    }
+}
 
-        Ok(match tag {
-            0 => {
-                let num_sectors = unpack_u16(instruction_data)?;
-                DequeInstruction::Initialize { num_sectors }
-            }
-            1 => {
-                let num_sectors = unpack_u16(instruction_data)?;
-                DequeInstruction::Resize { num_sectors }
-            }
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResizeInstructionData {
+    pub num_sectors: u16,
+}
 
-            2 => {
-                let (choice_bytes, amount_bytes) = instruction_data
-                    .split_first()
-                    .ok_or(ProgramError::InvalidInstructionData)?;
-                DequeInstruction::Deposit {
-                    choice: MarketEscrowChoice::try_from(*choice_bytes)?,
-                    amount: unpack_u64(amount_bytes)?,
-                }
-            }
-            3 => DequeInstruction::Withdraw {
-                choice: MarketEscrowChoice::try_from(instruction_data[0])?,
-            },
-            4 => DequeInstruction::FlushEventLog,
-            _ => return Err(ProgramError::InvalidInstructionData),
-        })
+impl Pack<3> for ResizeInstructionData {
+    #[inline(always)]
+    fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 3]) {
+        dst[0].write(Self::TAG);
+        write_bytes(&mut dst[1..3], &self.num_sectors.to_le_bytes());
+    }
+
+    #[inline(always)]
+    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+        // SAFETY: Caller guarantees instruction data has at least 2 bytes at offset 1.
+        let num_sectors = u16::from_le_bytes(unsafe {
+            *(instruction_data.get_unchecked(1..3).as_ptr() as *const [u8; U16_BYTES])
+        });
+        Self { num_sectors }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct DepositInstructionData {
+    pub choice: MarketChoice,
+    pub amount: u64,
+}
+
+// TODO: Check the actual sBPF output and see if the extensible impl we have here compiles to
+// roughly the same bytecode as inlining it with no extensibility/composition on the checks and
+// whatnot.
+impl Pack<10> for DepositInstructionData {
+    #[inline(always)]
+    fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 10]) {
+        dst[0].write(Self::TAG);
+        dst[1].write(self.choice as u8);
+        write_bytes(&mut dst[2..10], &self.amount.to_le_bytes());
+    }
+
+    #[inline(always)]
+    fn unpack(data: &[u8]) -> Result<Self, ProgramError> {
+        Self::check_len(data)?;
+        Self::check_tag(data)?;
+        require!(
+            MarketChoice::try_from(unsafe { *(data.get_unchecked(1)) }).is_ok(),
+            DequeError::InvalidMarketChoice
+        )?;
+        Ok(Self::unpack_unchecked(data))
+    }
+
+    #[inline(always)]
+    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+        // SAFETY: Caller guarantees instruction data has 1 byte at offset 1.
+        let choice_byte = unsafe { *(instruction_data.get_unchecked(1)) };
+        // SAFETY: Caller must ensure that that byte is either 0 or 1.
+        let choice = unsafe { core::mem::transmute::<u8, MarketChoice>(choice_byte) };
+        // SAFETY: Caller guarantees instruction data has 8 bytes at offset 2.
+        let amount = u64::from_le_bytes(unsafe {
+            *(instruction_data.get_unchecked(2..10).as_ptr() as *const [u8; 8])
+        });
+        Self { choice, amount }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct WithdrawInstructionData {
+    pub choice: MarketChoice,
+}
+
+impl Pack<2> for WithdrawInstructionData {
+    #[inline(always)]
+    fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 2]) {
+        dst[0].write(Self::TAG);
+        dst[1].write(self.choice as u8);
+    }
+
+    #[inline(always)]
+    fn unpack_unchecked(instruction_data: &[u8]) -> Self {
+        // SAFETY: Caller guarantees instruction data has 1 byte at offset 1.
+        let choice_byte = unsafe { *(instruction_data.get_unchecked(1)) };
+        // SAFETY: Caller must ensure that that byte is either 0 or 1.
+        let choice = unsafe { core::mem::transmute::<u8, MarketChoice>(choice_byte) };
+        Self { choice }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq)]
+pub struct FlushEventLogInstructionData {}
+
+impl Pack<1> for FlushEventLogInstructionData {
+    #[inline(always)]
+    fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 1]) {
+        dst[0].write(Self::TAG);
+    }
+
+    #[inline(always)]
+    fn unpack_unchecked(_instruction_data: &[u8]) -> Self {
+        Self {}
     }
 }
 
 pub mod tests {
     #[test]
-    pub fn check_deque_sizes() {
-        use super::DequeInstruction;
-        use strum::IntoEnumIterator;
-
-        for ixn in DequeInstruction::iter() {
-            assert_eq!(ixn.pack().len(), ixn.get_size());
-        }
+    pub fn u8_to_market_choice() {
+        use super::MarketChoice;
+        let data = [0, 1, 2, 3, 4];
+        assert!(MarketChoice::try_from(unsafe { *(data.get_unchecked(0)) }).is_ok());
+        assert!(MarketChoice::try_from(unsafe { *(data.get_unchecked(1)) }).is_ok());
+        assert!(MarketChoice::try_from(unsafe { *(data.get_unchecked(2)) }).is_err());
+        assert!(MarketChoice::try_from(unsafe { *(data.get_unchecked(3)) }).is_err());
+        assert!(MarketChoice::try_from(unsafe { *(data.get_unchecked(4)) }).is_err());
+        assert!(MarketChoice::try_from(unsafe { *(data.as_ptr().add(0)) }).is_ok());
+        assert!(MarketChoice::try_from(unsafe { *(data.as_ptr().add(1)) }).is_ok());
+        assert!(MarketChoice::try_from(unsafe { *(data.as_ptr().add(2)) }).is_err());
+        assert!(MarketChoice::try_from(unsafe { *(data.as_ptr().add(3)) }).is_err());
+        assert!(MarketChoice::try_from(unsafe { *(data.as_ptr().add(4)) }).is_err());
     }
 }

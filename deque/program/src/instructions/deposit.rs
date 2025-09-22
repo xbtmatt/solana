@@ -6,7 +6,7 @@ use solana_program::{
 use crate::{
     context::market_choice::MarketChoiceContext,
     events::{event_emitter::EventEmitter, DepositEvent},
-    instruction_enum::MarketEscrowChoice,
+    instruction_enum::MarketChoice,
     shared::token_utils::vault_transfers::deposit_to_vault,
     state::{Deque, DequeNode, MarketEscrow},
     utils::{from_sector_idx_mut, inline_resize},
@@ -16,7 +16,7 @@ pub fn process(
     _program_id: &Pubkey,
     accounts: &[AccountInfo],
     amount_in: u64,
-    choice: MarketEscrowChoice,
+    choice: MarketChoice,
     event_emitter: &mut EventEmitter,
 ) -> ProgramResult {
     let ctx = MarketChoiceContext::load(accounts, choice)?;
@@ -47,7 +47,7 @@ pub fn process(
             let node = from_sector_idx_mut::<DequeNode<MarketEscrow>>(deque.sectors, idx)?;
             match choice {
                 // Update the base amount in the existing node.
-                MarketEscrowChoice::Base => {
+                MarketChoice::Base => {
                     node.inner.base = node
                         .inner
                         .base
@@ -55,7 +55,7 @@ pub fn process(
                         .ok_or(ProgramError::InvalidArgument)?;
                 }
                 // Update the quote amount in the existing node.
-                MarketEscrowChoice::Quote => {
+                MarketChoice::Quote => {
                     node.inner.quote = node
                         .inner
                         .quote
@@ -78,8 +78,8 @@ pub fn process(
             let mut deque = Deque::new_from_bytes_unchecked(&mut data)?;
 
             let escrow = match choice {
-                MarketEscrowChoice::Base => MarketEscrow::new(*payer.key, amount, 0),
-                MarketEscrowChoice::Quote => MarketEscrow::new(*payer.key, 0, amount),
+                MarketChoice::Base => MarketEscrow::new(*payer.key, amount, 0),
+                MarketChoice::Quote => MarketEscrow::new(*payer.key, 0, amount),
             };
 
             deque

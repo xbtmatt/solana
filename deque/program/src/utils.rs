@@ -1,3 +1,5 @@
+use core::mem::MaybeUninit;
+
 use solana_program::{
     account_info::AccountInfo, entrypoint::ProgramResult, msg, program::invoke,
     program_error::ProgramError, pubkey::Pubkey, rent::Rent, system_instruction, sysvar::Sysvar,
@@ -171,4 +173,46 @@ pub fn inline_resize<'a, 'info>(
 
 pub(crate) mod sealed {
     pub trait Sealed {}
+}
+
+pub const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::uninit();
+
+/// A byte-by-byte copy from one slice to another without having to zero init on the `dst` slice.
+/// This is more explicit and less efficient than `sol_memcpy_` (in non-solana land it would be
+/// `copy_from_nonoverlapping`), but it removes the risk of undefined behavior since the iterator
+/// makes it impossible to write past the end of `dst`.
+///
+/// While it's not technically undefined behavior, a partially written to `dst` will result in
+/// unexpected results. Ensure that both slices are at least the expected length.
+///
+/// # Example
+/// ```
+/// use core::mem::MaybeUninit;
+///
+/// const UNINIT_BYTE: MaybeUninit<u8> = MaybeUninit::uninit();
+///
+/// // Build a simple 5-byte message: [type, id, id, id, id]
+/// let mut message = [UNINIT_BYTE; 5];
+/// let message_type: u8 = 3;
+/// let user_id: u32 = 1234;
+///
+/// // Write message type at offset 0
+/// write_bytes(&mut message[0..1], &[message_type]);
+/// // Write user ID at offset 1..5
+/// write_bytes(&mut message[1..5], &user_id.to_le_bytes());
+///
+/// // This confines the `unsafe` behavior to the raw pointer cast back to a slice, which is now
+/// // safe because all 5 bytes were explicitly written to.
+/// let final_message: &[u8] = unsafe {
+///     core::slice::from_raw_parts(message.as_ptr() as *const u8, 5)
+/// };
+/// ```
+///
+/// From pinocchio's `[no_std]` library:
+/// https://github.com/anza-xyz/pinocchio/blob/3044aaf5ea7eac01adc754d4bdf93c21c6e54d42/programs/token/src/lib.rs#L13`
+#[inline(always)]
+pub fn write_bytes(dst: &mut [MaybeUninit<u8>], src: &[u8]) {
+    for (d, s) in dst.iter_mut().zip(src.iter()) {
+        d.write(*s);
+    }
 }

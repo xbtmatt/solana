@@ -4,7 +4,7 @@ use solana_program::{
 };
 
 use crate::{
-    instruction_enum::MarketEscrowChoice,
+    instruction_enum::MarketChoice,
     state::Deque,
     utils::check_owned_and_writable,
     validation::token_accounts::{TokenAccountInfo, TokenMintInfo, TokenProgramInfo},
@@ -19,13 +19,13 @@ pub struct MarketChoiceContext<'a, 'info> {
     pub vault_ata: TokenAccountInfo<'a, 'info>,
     pub system_program: &'a AccountInfo<'info>,
     pub mint_info: TokenMintInfo<'a, 'info>,
-    pub choice: MarketEscrowChoice,
+    pub choice: MarketChoice,
 }
 
 impl<'a, 'info> MarketChoiceContext<'a, 'info> {
     pub fn load(
         accounts: &'a [AccountInfo<'info>],
-        choice: MarketEscrowChoice,
+        choice: MarketChoice,
     ) -> Result<MarketChoiceContext<'a, 'info>, ProgramError> {
         let accounts_iter = &mut accounts.iter();
         let deque_account = next_account_info(accounts_iter)?;
@@ -41,8 +41,8 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
         check_owned_and_writable(deque_account)?;
 
         let mint = match choice {
-            MarketEscrowChoice::Base => deque.header.base_mint,
-            MarketEscrowChoice::Quote => deque.header.quote_mint,
+            MarketChoice::Base => deque.header.base_mint,
+            MarketChoice::Quote => deque.header.quote_mint,
         };
 
         // Ensure the mint pubkey passed into account data matches the mint in header data.

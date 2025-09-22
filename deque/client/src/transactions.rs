@@ -102,11 +102,8 @@ pub fn send_deposit_or_withdraw(
     );
 
     let label = match deque_instruction {
-        DequeInstruction::Deposit {
-            amount: _,
-            choice: _,
-        } => "deposit",
-        DequeInstruction::Withdraw { choice: _ } => "withdraw",
+        DequeInstruction::Deposit(_) => "deposit",
+        DequeInstruction::Withdraw(_) => "withdraw",
         _ => panic!("Instruction must be deposit or withdraw."),
     };
 

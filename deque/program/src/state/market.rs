@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use solana_program::pubkey::Pubkey;
 
-use crate::instruction_enum::MarketEscrowChoice;
+use crate::instruction_enum::MarketChoice;
 
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 #[repr(C)]
@@ -20,10 +20,10 @@ impl MarketEscrow {
         }
     }
 
-    pub fn amount_from_choice(&self, choice: &MarketEscrowChoice) -> u64 {
+    pub fn amount_from_choice(&self, choice: &MarketChoice) -> u64 {
         match choice {
-            MarketEscrowChoice::Base => self.base,
-            MarketEscrowChoice::Quote => self.quote,
+            MarketChoice::Base => self.base,
+            MarketChoice::Quote => self.quote,
         }
     }
 }

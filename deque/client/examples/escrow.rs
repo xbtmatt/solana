@@ -1,4 +1,6 @@
-use deque::instruction_enum::{DequeInstruction, MarketEscrowChoice};
+use deque::instruction_enum::{
+    DepositInstructionData, DequeInstruction, MarketChoice, WithdrawInstructionData,
+};
 use deque_client::{
     logs::print_size_and_sectors,
     tokens::{generate_market, INITIAL_MINT_AMOUNT},
@@ -39,8 +41,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         payer,
         &[payer],
         vec![
-            ctx.create_ata_ixn(payer, MarketEscrowChoice::Base),
-            ctx.create_ata_ixn(payer, MarketEscrowChoice::Quote),
+            ctx.create_ata_ixn(payer, MarketChoice::Base),
+            ctx.create_ata_ixn(payer, MarketChoice::Quote),
             ctx.initialize_deque_ixn(payer, 0),
         ],
         "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
@@ -54,10 +56,10 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         payer_base_ata,
         ctx.base_mint,
         ctx.vault_base_ata,
-        &DequeInstruction::Deposit {
+        &DequeInstruction::Deposit(DepositInstructionData {
             amount: 1000,
-            choice: MarketEscrowChoice::Base,
-        },
+            choice: MarketChoice::Base,
+        }),
     );
 
     // ----------------------------------------- Withdraw -------------------------------------------
@@ -68,9 +70,9 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         payer_base_ata,
         ctx.base_mint,
         ctx.vault_base_ata,
-        &DequeInstruction::Withdraw {
-            choice: MarketEscrowChoice::Base,
-        },
+        &DequeInstruction::Withdraw(WithdrawInstructionData {
+            choice: MarketChoice::Base,
+        }),
     );
 
     // ------------------------------------------- Fuzz --------------------------------------------
@@ -94,10 +96,10 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
                 payer_base_ata,
                 ctx.base_mint,
                 ctx.vault_base_ata,
-                &DequeInstruction::Deposit {
+                &DequeInstruction::Deposit(DepositInstructionData {
                     amount,
-                    choice: MarketEscrowChoice::Base,
-                },
+                    choice: MarketChoice::Base,
+                }),
             );
         }
 
@@ -109,9 +111,9 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             payer_base_ata,
             ctx.base_mint,
             ctx.vault_base_ata,
-            &DequeInstruction::Withdraw {
-                choice: MarketEscrowChoice::Base,
-            },
+            &DequeInstruction::Withdraw(WithdrawInstructionData {
+                choice: MarketChoice::Base,
+            }),
         );
 
         println!("Expected withdrawn: {}", expected);

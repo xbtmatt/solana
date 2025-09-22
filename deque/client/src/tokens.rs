@@ -1,12 +1,12 @@
 use anyhow::Context;
 use deque::{
-    instruction_enum::{DequeInstruction, MarketEscrowChoice},
+    instruction_enum::{DequeInstruction, InitializeInstructionData, MarketChoice},
     seeds,
 };
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
-    program_pack::Pack,
+    program_pack::Pack as SolanaPack,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
     system_instruction, system_program,
@@ -103,10 +103,10 @@ pub struct DequeContext {
 }
 
 impl DequeContext {
-    pub fn create_ata_ixn(&self, payer: &Keypair, choice: MarketEscrowChoice) -> Instruction {
+    pub fn create_ata_ixn(&self, payer: &Keypair, choice: MarketChoice) -> Instruction {
         let (mint, token_program) = match choice {
-            MarketEscrowChoice::Base => (&self.base_mint, &self.base_token_program),
-            MarketEscrowChoice::Quote => (&self.quote_mint, &self.quote_token_program),
+            MarketChoice::Base => (&self.base_mint, &self.base_token_program),
+            MarketChoice::Quote => (&self.quote_mint, &self.quote_token_program),
         };
         spl_associated_token_account::instruction::create_associated_token_account_idempotent(
             &payer.pubkey(),
@@ -119,7 +119,7 @@ impl DequeContext {
     pub fn initialize_deque_ixn(&self, payer: &Keypair, num_sectors: u16) -> Instruction {
         Instruction {
             program_id: deque::ID,
-            data: DequeInstruction::Initialize { num_sectors }.pack(),
+            data: DequeInstruction::Initialize(InitializeInstructionData { num_sectors }).pack(),
             accounts: vec![
                 AccountMeta::new_readonly(deque::ID, false),
                 AccountMeta::new_readonly(seeds::event_authority::ID, false),

@@ -5,7 +5,12 @@ use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubke
 
 use crate::context::event_emitter::EventEmitterContext;
 use crate::events::event_emitter::EventEmitter;
-use crate::instruction_enum::DequeInstruction;
+use crate::instruction_enum::{
+    DepositInstructionData, InitializeInstructionData, InstructionTag, ResizeInstructionData,
+    WithdrawInstructionData,
+};
+use crate::pack::Pack;
+use crate::shared::error::DequeError;
 use crate::utils::log_bytes;
 use crate::{instructions, require, seeds};
 
@@ -17,9 +22,11 @@ pub fn process_instruction(
     msg!("__INSTRUCTION DATA__");
     log_bytes(instruction_data);
 
-    let instruction = DequeInstruction::unpack(instruction_data)?;
+    let instruction_tag: InstructionTag = instruction_data[0].try_into()?;
 
-    if let DequeInstruction::FlushEventLog = instruction {
+    // If the instruction is for an event log flush, flush and return early, as the number of
+    // account checks are only valid for non-flush instructions.
+    if let InstructionTag::FlushEventLog = instruction_tag {
         let authority = next_account_info(&mut accounts.iter())?;
         require!(
             authority.is_signer,
@@ -31,10 +38,18 @@ pub fn process_instruction(
             ProgramError::IncorrectAuthority,
             "Invalid event authority"
         )?;
+        msg!("Flushing! 🚽");
         return Ok(());
-    };
+    }
 
     // Split [self program, event authority] from the rest of the accounts.
+    require!(
+        accounts.len() > 2,
+        DequeError::InvalidNumberOfAccounts,
+        "Expected at least {} accounts, got: {}",
+        2,
+        accounts.len()
+    )?;
     let (event_emitter_accounts, accounts) = accounts.split_at(2);
     let event_ctx = EventEmitterContext::load(event_emitter_accounts)?;
 
@@ -43,31 +58,40 @@ pub fn process_instruction(
         // TODO: Fix this logic here, these are *not* correct.
         accounts[0].key,
         accounts[1].key,
-        instruction_data[0],
+        instruction_tag,
     )?;
 
-    match instruction {
-        DequeInstruction::Initialize { num_sectors } => {
-            instructions::initialize::process(program_id, accounts, num_sectors)?
+    match instruction_tag {
+        InstructionTag::Initialize => {
+            let num_sectors = InitializeInstructionData::unpack(instruction_data)?.num_sectors;
+            instructions::initialize::process(program_id, accounts, num_sectors)?;
         }
-        DequeInstruction::Resize { num_sectors } => {
-            instructions::resize::process(program_id, accounts, num_sectors)?
+        InstructionTag::Resize => {
+            let num_sectors = ResizeInstructionData::unpack(instruction_data)?.num_sectors;
+            instructions::resize::process(program_id, accounts, num_sectors)?;
         }
-        DequeInstruction::Deposit { amount, choice } => {
+        InstructionTag::Deposit => {
+            let deposit = DepositInstructionData::unpack(instruction_data)?;
             instructions::deposit::process(
                 program_id,
                 accounts,
-                amount,
-                choice,
+                deposit.amount,
+                deposit.choice,
                 &mut event_emitter,
             )?;
             event_emitter.flush()?;
         }
-        DequeInstruction::Withdraw { choice } => {
-            instructions::withdraw::process(program_id, accounts, choice, &mut event_emitter)?;
+        InstructionTag::Withdraw => {
+            let withdraw = WithdrawInstructionData::unpack(instruction_data)?;
+            instructions::withdraw::process(
+                program_id,
+                accounts,
+                withdraw.choice,
+                &mut event_emitter,
+            )?;
             event_emitter.flush()?;
         }
-        DequeInstruction::FlushEventLog => msg!("Flushing! 🚽"),
+        _ => unreachable!(),
     }
 
     Ok(())

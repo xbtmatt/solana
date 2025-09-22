@@ -11,7 +11,7 @@ use solana_program::{
 use crate::{
     context::event_emitter::EventEmitterContext,
     events::{EmittableEvent, EventHeader},
-    instruction_enum::DequeInstruction,
+    instruction_enum::InstructionTag,
     seeds,
 };
 
@@ -28,24 +28,21 @@ impl<'info> EventEmitter<'info> {
         ctx: EventEmitterContext<'a, 'info>,
         market: &Pubkey,
         sender: &Pubkey,
-        instruction_tag: u8,
+        instruction_tag: InstructionTag,
     ) -> Result<Self, ProgramError> {
         // TODO: benchmark the cost of allocating the full max CPI data length up front as opposed
         // to resizing infrequently
-        let mut data = Vec::with_capacity(MAX_CPI_INSTRUCTION_DATA_LEN as usize);
+        let mut data: Vec<u8> = Vec::with_capacity(MAX_CPI_INSTRUCTION_DATA_LEN as usize);
 
-        // TODO: Separate the instruction tag from enum data, use only the tag here.
-        // This will change several other things, too.
-        DequeInstruction::FlushEventLog.pack_into_vec(&mut data);
-        // TODO: Fill this with meaningful data.
-        EventHeader {
-            market,
-            sender,
-            instruction: instruction_tag,
-            nonce: 1,
-            emitted_count: 10,
+        // Safety: `data` was just allocated with MAX_CPI_INSTRUCTION_DATA_LEN, and the length
+        // is now exactly equal to one byte.
+        unsafe {
+            data.as_mut_ptr().write(InstructionTag::FlushEventLog as u8);
+            data.set_len(1);
         }
-        .write(&mut data)?;
+
+        // TODO: Fill this with meaningful data.
+        EventHeader::new(instruction_tag, market, sender, 1, 10).write(&mut data)?;
 
         Ok(Self {
             emit_instruction: Instruction {

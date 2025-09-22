@@ -6,7 +6,7 @@ use solana_program::{
 use crate::{
     context::market_choice::MarketChoiceContext,
     events::{event_emitter::EventEmitter, WithdrawEvent},
-    instruction_enum::MarketEscrowChoice,
+    instruction_enum::MarketChoice,
     shared::token_utils::vault_transfers::withdraw_from_vault,
     state::{Deque, MarketEscrow},
 };
@@ -14,7 +14,7 @@ use crate::{
 pub fn process(
     _program_id: &Pubkey,
     accounts: &[AccountInfo],
-    choice: MarketEscrowChoice,
+    choice: MarketChoice,
     event_emitter: &mut EventEmitter,
 ) -> ProgramResult {
     let ctx = MarketChoiceContext::load(accounts, choice)?;
