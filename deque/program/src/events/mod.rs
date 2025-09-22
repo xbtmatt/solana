@@ -33,7 +33,16 @@ pub trait EmittableEvent: Sealed + Sized {
     unsafe fn write_unchecked(&self, buf: &mut Vec<u8>);
 
     #[cfg(feature = "client")]
-    fn unpack(data: &[u8]) -> Result<Self, ProgramError>;
+    fn try_from_slice(&self, data: &[u8]) -> Result<Self, ProgramError> {
+        require!(
+            data.len() >= Self::LEN,
+            ProgramError::InvalidInstructionData
+        )?;
+        Ok(Self::from_slice_unchecked(data))
+    }
+
+    #[cfg(feature = "client")]
+    fn from_slice_unchecked(data: &[u8]) -> Self;
 }
 
 pub struct EventHeader<'p> {
@@ -62,8 +71,21 @@ impl EmittableEvent for EventHeader<'_> {
     }
 
     #[cfg(feature = "client")]
-    fn unpack(data: &[u8]) -> Result<Self, ProgramError> {
-        todo!();
+    fn from_slice_unchecked<'p>(data: &[u8]) -> Self {
+        use arrayref::array_ref;
+
+        Self {
+            discriminant: data[0],
+            instruction_tag: data[1],
+            // SAFETY: data[2..34] is exactly 32 bytes and Pubkey is repr(transparent) over [u8; 32]
+            // Casted from input slice to preserve the 'p lifetime.
+            market: unsafe { &*(data[2..34].as_ptr() as *const Pubkey) },
+            // SAFETY: data[34..66] is exactly 32 bytes and Pubkey is repr(transparent) over [u8; 32]
+            // Casted from input slice to preserve the 'p lifetime.
+            sender: unsafe { &*(data[34..66].as_ptr() as *const Pubkey) },
+            nonce: u64::from_le_bytes(*array_ref![data, 66, 8]),
+            emitted_count: u16::from_le_bytes(*array_ref![data, 74, 2]),
+        }
     }
 }
 
@@ -107,8 +129,15 @@ impl EmittableEvent for DepositEvent<'_> {
     }
 
     #[cfg(feature = "client")]
-    fn unpack(data: &[u8]) -> Result<Self, ProgramError> {
-        todo!();
+    fn from_slice_unchecked(data: &[u8]) -> Self {
+        Self {
+            discriminant: data[0],
+            instruction_tag: data[1],
+            market: Pubkey::new_from_array(data[2..34]),
+            sender: Pubkey::new_from_array(data[34..66]),
+            nonce: u64::from_le_bytes(data[66..74]),
+            emitted_count: u16::from_le_bytes(data[74..76]),
+        }
     }
 }
 
@@ -134,7 +163,14 @@ impl EmittableEvent for WithdrawEvent<'_> {
     }
 
     #[cfg(feature = "client")]
-    fn unpack(data: &[u8]) -> Result<Self, ProgramError> {
-        todo!();
+    fn from_slice_unchecked(data: &[u8]) -> Self {
+        Self {
+            discriminant: data[0],
+            instruction_tag: data[1],
+            market: Pubkey::new_from_array(data[2..34]),
+            sender: Pubkey::new_from_array(data[34..66]),
+            nonce: u64::from_le_bytes(data[66..74]),
+            emitted_count: u16::from_le_bytes(data[74..76]),
+        }
     }
 }

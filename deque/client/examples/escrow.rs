@@ -46,7 +46,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             ctx.initialize_deque_ixn(payer, 0),
         ],
         "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
-    );
+    )
+    .expect("Should initialize");
 
     // ----------------------------------------- Deposit -------------------------------------------
     send_deposit_or_withdraw(
@@ -60,7 +61,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             amount: 1000,
             choice: MarketChoice::Base,
         }),
-    );
+    )
+    .and_then(parse_txn)?;
 
     // ----------------------------------------- Withdraw -------------------------------------------
     send_deposit_or_withdraw(
@@ -73,7 +75,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         &DequeInstruction::Withdraw(WithdrawInstructionData {
             choice: MarketChoice::Base,
         }),
-    );
+    )
+    .and_then(parse_txn)?;
 
     // ------------------------------------------- Fuzz --------------------------------------------
     const ROUNDS: u64 = 10;

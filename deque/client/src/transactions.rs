@@ -1,12 +1,12 @@
 use anyhow::Context;
 use deque::{instruction_enum::DequeInstruction, seeds};
-use solana_client::rpc_client::RpcClient;
+use solana_client::{client_error::ClientError, rpc_client::RpcClient};
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
     instruction::{AccountMeta, Instruction},
     message::Message,
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::{Keypair, Signature, Signer},
     system_program,
     transaction::Transaction,
 };
@@ -37,14 +37,14 @@ pub async fn fund_account(rpc: &RpcClient, keypair: Option<Keypair>) -> anyhow::
     Ok(payer)
 }
 
-// Generic transaction.
+#[allow(clippy::result_large_err)]
 pub fn send_txn(
     rpc: &RpcClient,
     payer: &Keypair,
     signers: &[&Keypair],
     ixns: Vec<Instruction>,
     txn_label: String,
-) {
+) -> Result<Signature, ClientError> {
     let bh = rpc
         .get_latest_blockhash()
         .or(Err(()))
@@ -73,12 +73,13 @@ pub fn send_txn(
     match rpc.send_and_confirm_transaction(&tx) {
         Ok(sig) => {
             println!("✓: Called {}, {}", txn_label, sig);
+            Ok(sig)
         }
         Err(e) => {
             eprintln!("Failed to call {}: {}", txn_label, e);
-            panic!();
+            Err(e)
         }
-    };
+    }
 }
 
 pub enum DepositOrWithdraw {
@@ -86,6 +87,7 @@ pub enum DepositOrWithdraw {
     Withdraw,
 }
 
+#[allow(clippy::result_large_err)]
 pub fn send_deposit_or_withdraw(
     rpc: &RpcClient,
     payer: &Keypair,
@@ -94,7 +96,7 @@ pub fn send_deposit_or_withdraw(
     mint: Pubkey,
     vault_ata: Pubkey,
     deque_instruction: &DequeInstruction,
-) {
+) -> Result<Signature, ClientError> {
     println!(
         "BEFORE: payer, vault: ({}, {})",
         get_token_balance(rpc, &payer.pubkey(), &mint),
@@ -123,7 +125,7 @@ pub fn send_deposit_or_withdraw(
         ],
     };
 
-    send_txn(rpc, payer, &[payer], vec![ixn], label.to_string());
+    let sig = send_txn(rpc, payer, &[payer], vec![ixn], label.to_string())?;
 
     println!(
         "AFTER:  payer, vault: ({}, {})",
@@ -132,4 +134,6 @@ pub fn send_deposit_or_withdraw(
     );
 
     inspect_account(rpc, &deque_pubkey, false);
+
+    Ok(sig)
 }
