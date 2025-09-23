@@ -12,6 +12,7 @@ pub struct MarketEscrow {
 }
 
 impl MarketEscrow {
+    #[inline(always)]
     pub fn new(trader: Pubkey, base: u64, quote: u64) -> Self {
         MarketEscrow {
             trader,
@@ -20,10 +21,19 @@ impl MarketEscrow {
         }
     }
 
+    #[inline(always)]
     pub fn amount_from_choice(&self, choice: &MarketChoice) -> u64 {
         match choice {
             MarketChoice::Base => self.base,
             MarketChoice::Quote => self.quote,
+        }
+    }
+
+    #[inline(always)]
+    pub fn amount_of_opposite_choice(&self, choice: &MarketChoice) -> u64 {
+        match choice {
+            MarketChoice::Base => self.quote,
+            MarketChoice::Quote => self.base,
         }
     }
 }

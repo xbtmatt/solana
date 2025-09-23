@@ -3,11 +3,12 @@ use deque::instruction_enum::{
     DepositInstructionData, DequeInstruction, MarketChoice, WithdrawInstructionData,
 };
 use deque_client::{
-    events::get_transaction_events,
+    events::fetch_parsed_txn,
     logs::print_size_and_sectors,
     tokens::{generate_market, DequeContext, INITIAL_MINT_AMOUNT},
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
 };
+use itertools::Itertools;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
@@ -52,8 +53,33 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
     )
     .context("Should initialize")?;
 
+    // ------------------------------ Deposit base, base, quote --------------------------------
+
+    let ixns = vec![
+        DepositInstructionData::new(1000, MarketChoice::Base).into(),
+        DepositInstructionData::new(23458, MarketChoice::Quote).into(),
+        DepositInstructionData::new(184, MarketChoice::Base).into(),
+        WithdrawInstructionData::new(MarketChoice::Base).into(),
+        WithdrawInstructionData::new(MarketChoice::Quote).into(),
+    ]
+    .into_iter()
+    .map(|ixn_data| ctx.deposit_or_withdraw_ixn(payer, ixn_data))
+    .collect_vec();
+
+    let parsed_txn = send_txn(
+        rpc,
+        payer,
+        &[payer],
+        ixns,
+        "lots of deposits/withdraws".to_string(),
+    )
+    .and_then(|sig| fetch_parsed_txn(rpc, sig))?;
+
+    let deque_events = parsed_txn.get_inner_deque_events()?;
+    println!("{:#?}", deque_events);
+
     // ----------------------------------------- Deposit -------------------------------------------
-    send_deposit_or_withdraw(
+    let parsed_txn = send_deposit_or_withdraw(
         rpc,
         payer,
         ctx.deque_pubkey,
@@ -65,11 +91,13 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
             choice: MarketChoice::Base,
         }),
     )
-    .map(|sig| get_transaction_events(rpc, sig).context("Couldn't parse withdraw txn"))
-    .context("Couldn't withdraw base.")??;
+    .and_then(|sig| fetch_parsed_txn(rpc, sig))?;
+
+    let deque_events = parsed_txn.get_inner_deque_events()?;
+    println!("{:#?}", deque_events);
 
     // ----------------------------------------- Withdraw -------------------------------------------
-    send_deposit_or_withdraw(
+    let parsed_txn = send_deposit_or_withdraw(
         rpc,
         payer,
         ctx.deque_pubkey,
@@ -80,8 +108,28 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
             choice: MarketChoice::Base,
         }),
     )
-    .map(|sig| get_transaction_events(rpc, sig).context("Couldn't parse deposit txn"))
-    .context("Couldn't withdraw base")??;
+    .map(|sig| fetch_parsed_txn(rpc, sig))??;
+
+    let deque_events = parsed_txn.get_inner_deque_events()?;
+    println!("{:#?}", deque_events);
+
+    // // ----------------------------------------- Deposit -------------------------------------------
+    let parsed_txn = send_deposit_or_withdraw(
+        rpc,
+        payer,
+        ctx.deque_pubkey,
+        payer_base_ata,
+        ctx.base_mint,
+        ctx.vault_base_ata,
+        &DequeInstruction::Deposit(DepositInstructionData {
+            amount: 1000,
+            choice: MarketChoice::Base,
+        }),
+    )
+    .map(|sig| fetch_parsed_txn(rpc, sig))??;
+
+    let deque_events = parsed_txn.get_inner_deque_events()?;
+    println!("{:#?}", deque_events);
 
     // ------------------------------------------- Fuzz --------------------------------------------
     const ROUNDS: u64 = 0;

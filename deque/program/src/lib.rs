@@ -20,8 +20,8 @@ pub mod validation;
 
 #[cfg(not(target_os = "solana"))]
 pub const fn id_str() -> &'static str {
-    "4o8MdmWKP5FzAacZsj4QboX7rkUQbmMp87MBwdqarHtb"
+    "44w6cQa6hhEqsbfokN38qTXeo2JFozX6SRL9ChZDSnSW"
 }
-declare_id!(id_str());
+declare_id!("44w6cQa6hhEqsbfokN38qTXeo2JFozX6SRL9ChZDSnSW");
 
 entrypoint!(process_instruction);

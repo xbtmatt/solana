@@ -16,6 +16,7 @@ pub(crate) fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64) {
 }
 
 #[cfg(not(target_os = "solana"))]
+#[allow(dead_code)]
 pub(crate) fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64) {
     unsafe {
         core::ptr::copy_nonoverlapping(src, dst, n as usize);

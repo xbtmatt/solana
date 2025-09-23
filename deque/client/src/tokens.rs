@@ -1,6 +1,10 @@
 use anyhow::Context;
 use deque::{
-    instruction_enum::{DequeInstruction, InitializeInstructionData, MarketChoice},
+    instruction_enum::{
+        DepositInstructionData, DequeInstruction, InitializeInstructionData, MarketChoice,
+        WithdrawInstructionData,
+    },
+    pack::Pack,
     seeds,
 };
 use solana_client::rpc_client::RpcClient;
@@ -9,8 +13,10 @@ use solana_sdk::{
     program_pack::Pack as SolanaPack,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
-    system_instruction, system_program,
 };
+
+#[allow(deprecated)]
+use solana_sdk::{system_instruction, system_program};
 
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Mint;
@@ -103,7 +109,31 @@ pub struct DequeContext {
     pub ata_program: Pubkey,
 }
 
+pub enum DepositOrWithdraw {
+    Deposit(DepositInstructionData),
+    Withdraw(WithdrawInstructionData),
+}
+
+impl From<DepositInstructionData> for DepositOrWithdraw {
+    fn from(data: DepositInstructionData) -> Self {
+        Self::Deposit(data)
+    }
+}
+
+impl From<WithdrawInstructionData> for DepositOrWithdraw {
+    fn from(data: WithdrawInstructionData) -> Self {
+        Self::Withdraw(data)
+    }
+}
+
 impl DequeContext {
+    pub fn get_atas(&self, owner: &Pubkey) -> (Pubkey, Pubkey) {
+        (
+            get_associated_token_address(owner, &self.base_mint),
+            get_associated_token_address(owner, &self.quote_mint),
+        )
+    }
+
     pub fn create_ata_ixn(&self, payer: &Keypair, choice: MarketChoice) -> Instruction {
         let (mint, token_program) = match choice {
             MarketChoice::Base => (&self.base_mint, &self.base_token_program),
@@ -133,6 +163,40 @@ impl DequeContext {
                 AccountMeta::new_readonly(self.base_token_program, false),
                 AccountMeta::new_readonly(self.quote_token_program, false),
                 AccountMeta::new_readonly(self.ata_program, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        }
+    }
+
+    pub fn deposit_or_withdraw_ixn(
+        &self,
+        payer: &Keypair,
+        instruction: DepositOrWithdraw,
+    ) -> Instruction {
+        let (base_ata, quote_ata) = self.get_atas(&payer.pubkey());
+
+        let (data, choice) = match instruction {
+            DepositOrWithdraw::Deposit(deposit) => (deposit.pack().to_vec(), deposit.choice),
+            DepositOrWithdraw::Withdraw(withdraw) => (withdraw.pack().to_vec(), withdraw.choice),
+        };
+
+        let (payer_ata, mint, vault_ata) = match choice {
+            MarketChoice::Base => (base_ata, self.base_mint, self.vault_base_ata),
+            MarketChoice::Quote => (quote_ata, self.quote_mint, self.vault_quote_ata),
+        };
+
+        Instruction {
+            program_id: deque::ID,
+            data,
+            accounts: vec![
+                AccountMeta::new_readonly(deque::ID, false),
+                AccountMeta::new_readonly(seeds::event_authority::ID, false),
+                AccountMeta::new(self.deque_pubkey, false),
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(payer_ata, false),
+                AccountMeta::new_readonly(spl_token::id(), false),
+                AccountMeta::new_readonly(mint, false),
+                AccountMeta::new(vault_ata, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
         }

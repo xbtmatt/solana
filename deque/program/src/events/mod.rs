@@ -32,7 +32,7 @@ impl TryFrom<u8> for EventTag {
 }
 
 #[cfg(not(target_os = "solana"))]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DequeEvent<'p> {
     Header(HeaderEventData<'p>),
     // Initialize(InitializeEventData),
@@ -106,7 +106,8 @@ pub trait EmittableEvent: Sized {
     }
 }
 
-#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug))]
+#[repr(C)]
+#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug, Eq, PartialEq))]
 pub struct HeaderEventData<'p> {
     pub discriminant: u8,
     pub instruction_tag: InstructionTag,
@@ -150,7 +151,7 @@ impl EmittableEvent for HeaderEventData<'_> {
 }
 
 impl<'p> HeaderEventData<'p> {
-    fn new(
+    pub fn new(
         instruction_tag: InstructionTag,
         market: &'p Pubkey,
         sender: &'p Pubkey,
@@ -168,7 +169,8 @@ impl<'p> HeaderEventData<'p> {
     }
 }
 
-#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug))]
+#[repr(C)]
+#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug, Eq, PartialEq))]
 pub struct DepositEventData<'p> {
     pub discriminant: u8,
     pub trader: &'p Pubkey,
@@ -205,7 +207,7 @@ impl EmittableEvent for DepositEventData<'_> {
             discriminant: data[0],
             trader: unsafe { &*(data[1..33].as_ptr() as *const Pubkey) },
             amount: u64::from_le_bytes(*array_ref![data, 33, 8]),
-            side: data[32]
+            side: data[41]
                 .try_into()
                 .expect("Market choice enum should have been validated."),
         }
@@ -213,7 +215,7 @@ impl EmittableEvent for DepositEventData<'_> {
 }
 
 #[repr(C)]
-#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug))]
+#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug, Eq, PartialEq))]
 pub struct WithdrawEventData<'p> {
     pub discriminant: u8,
     pub trader: &'p Pubkey,
@@ -250,7 +252,7 @@ impl EmittableEvent for WithdrawEventData<'_> {
             discriminant: data[0],
             trader: unsafe { &*(data[1..33].as_ptr() as *const Pubkey) },
             amount: u64::from_le_bytes(*array_ref![data, 33, 8]),
-            side: data[32]
+            side: data[41]
                 .try_into()
                 .expect("Market choice enum should have been validated."),
         }

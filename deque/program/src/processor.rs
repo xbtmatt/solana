@@ -11,7 +11,6 @@ use crate::instruction_enum::{
 };
 use crate::pack::Pack;
 use crate::shared::error::DequeError;
-use crate::utils::log_bytes;
 use crate::{instructions, require, seeds};
 
 pub fn process_instruction(
@@ -19,9 +18,6 @@ pub fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    msg!("__INSTRUCTION DATA__");
-    log_bytes(instruction_data);
-
     let instruction_tag: InstructionTag = instruction_data[0].try_into()?;
 
     // If the instruction is for an event log flush, flush and return early, as the number of

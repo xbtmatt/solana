@@ -8,7 +8,8 @@ use crate::{
     events::{event_emitter::EventEmitter, WithdrawEventData},
     instruction_enum::MarketChoice,
     shared::token_utils::vault_transfers::withdraw_from_vault,
-    state::{Deque, MarketEscrow},
+    state::{Deque, DequeNode, MarketEscrow},
+    utils::from_sector_idx_mut,
 };
 
 pub fn process(
@@ -41,15 +42,30 @@ pub fn process(
     let amount = match escrow_and_idx {
         Some((escrow, idx)) => {
             let amount = escrow.amount_from_choice(&ctx.choice);
-            withdraw_from_vault(&ctx, amount)?;
+
+            if amount > 0 {
+                withdraw_from_vault(&ctx, amount)?;
+            }
 
             let mut data = deque_account.data.borrow_mut();
             let mut deque = Deque::new_from_bytes_unchecked(&mut data)?;
 
-            // And remove the node from the deque.
-            deque
-                .remove::<MarketEscrow>(idx)
-                .map_err(|_| ProgramError::InvalidAccountData)?;
+            // Remove the node from the deque if the trader has no coins in either token.
+            if escrow.amount_of_opposite_choice(&ctx.choice) == 0 {
+                msg!("Both amounts are 0. Removing node from the deque!");
+                deque
+                    .remove::<MarketEscrow>(idx)
+                    .map_err(|_| ProgramError::InvalidAccountData)?;
+            } else {
+                // Otherwise, just zero out the one that was just withdrawn.
+                msg!("Zeroing out the token that was withdrawn.");
+                let node = from_sector_idx_mut::<DequeNode<MarketEscrow>>(deque.sectors, idx)?;
+                match choice {
+                    MarketChoice::Base => node.inner.base = 0,
+                    MarketChoice::Quote => node.inner.quote = 0,
+                };
+            }
+
             msg!("Withdrawing {} coins", amount);
 
             amount

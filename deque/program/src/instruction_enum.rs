@@ -12,10 +12,10 @@ use crate::{
 };
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(test, derive(Default))]
+#[derive(Clone, Copy)]
+#[cfg_attr(not(target_os = "solana"), derive(Default, Debug, Eq, PartialEq))]
 pub enum MarketChoice {
-    #[cfg_attr(test, default)]
+    #[cfg_attr(not(target_os = "solana"), default)]
     Base,
     Quote,
 }
@@ -33,7 +33,8 @@ impl TryFrom<u8> for MarketChoice {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
 pub enum InstructionTag {
     Initialize,
     Resize,
@@ -85,7 +86,8 @@ impl TryFrom<u8> for InstructionTag {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
 pub struct InitializeInstructionData {
     pub num_sectors: u16,
 }
@@ -109,7 +111,8 @@ impl Pack<3> for InitializeInstructionData {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
 pub struct ResizeInstructionData {
     pub num_sectors: u16,
 }
@@ -132,10 +135,25 @@ impl Pack<3> for ResizeInstructionData {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
 pub struct DepositInstructionData {
     pub choice: MarketChoice,
     pub amount: u64,
+}
+
+#[cfg(not(target_os = "solana"))]
+impl DepositInstructionData {
+    pub fn new(amount: u64, choice: MarketChoice) -> Self {
+        DepositInstructionData { amount, choice }
+    }
+}
+
+#[cfg(not(target_os = "solana"))]
+impl WithdrawInstructionData {
+    pub fn new(choice: MarketChoice) -> Self {
+        WithdrawInstructionData { choice }
+    }
 }
 
 // TODO: Check the actual sBPF output and see if the extensible impl we have here compiles to
@@ -176,7 +194,8 @@ impl Pack<10> for DepositInstructionData {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
 pub struct WithdrawInstructionData {
     pub choice: MarketChoice,
 }
@@ -199,7 +218,8 @@ impl Pack<2> for WithdrawInstructionData {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
 pub struct FlushEventLogInstructionData {}
 
 impl Pack<1> for FlushEventLogInstructionData {

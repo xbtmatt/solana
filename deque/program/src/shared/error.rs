@@ -63,3 +63,6 @@ impl core::fmt::Display for DequeError {
         write!(f, "{:?}", self)
     }
 }
+
+#[cfg(not(target_os = "solana"))]
+impl std::error::Error for DequeError {}

@@ -26,8 +26,8 @@ pub struct EventEmitter<'a> {
 impl<'info> EventEmitter<'info> {
     pub(crate) fn new<'a>(
         ctx: EventEmitterContext<'a, 'info>,
-        market: &Pubkey,
         sender: &Pubkey,
+        market: &Pubkey,
         instruction_tag: InstructionTag,
     ) -> Result<Self, ProgramError> {
         // TODO: benchmark the cost of allocating the full max CPI data length up front as opposed

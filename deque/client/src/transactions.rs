@@ -1,6 +1,6 @@
 use anyhow::Context;
 use deque::{instruction_enum::DequeInstruction, seeds};
-use solana_client::{client_error::ClientError, rpc_client::RpcClient};
+use solana_client::rpc_client::RpcClient;
 use solana_program::system_program;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
@@ -44,7 +44,7 @@ pub fn send_txn(
     signers: &[&Keypair],
     ixns: Vec<Instruction>,
     txn_label: String,
-) -> Result<Signature, ClientError> {
+) -> anyhow::Result<Signature> {
     let bh = rpc
         .get_latest_blockhash()
         .or(Err(()))
@@ -77,7 +77,7 @@ pub fn send_txn(
         }
         Err(e) => {
             eprintln!("Failed to call {}: {}", txn_label, e);
-            Err(e)
+            Err(e).context("Failed to call")
         }
     }
 }
@@ -96,18 +96,19 @@ pub fn send_deposit_or_withdraw(
     mint: Pubkey,
     vault_ata: Pubkey,
     deque_instruction: &DequeInstruction,
-) -> Result<Signature, ClientError> {
-    println!(
-        "BEFORE: payer, vault: ({}, {})",
-        get_token_balance(rpc, &payer.pubkey(), &mint),
-        get_token_balance(rpc, &deque_pubkey, &mint)
-    );
-
+) -> anyhow::Result<Signature> {
     let label = match deque_instruction {
         DequeInstruction::Deposit(_) => "deposit",
         DequeInstruction::Withdraw(_) => "withdraw",
         _ => panic!("Instruction must be deposit or withdraw."),
     };
+
+    println!(
+        "BEFORE {}: payer, vault: ({}, {})",
+        label,
+        get_token_balance(rpc, &payer.pubkey(), &mint),
+        get_token_balance(rpc, &deque_pubkey, &mint)
+    );
 
     let ixn = Instruction {
         program_id: deque::ID,
