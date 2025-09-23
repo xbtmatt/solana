@@ -18,6 +18,10 @@ pub(crate) mod syscalls;
 pub mod utils;
 pub mod validation;
 
-declare_id!("4o8MdmWKP5FzAacZsj4QboX7rkUQbmMp87MBwdqarHtb");
+#[cfg(not(target_os = "solana"))]
+pub const fn id_str() -> &'static str {
+    "4o8MdmWKP5FzAacZsj4QboX7rkUQbmMp87MBwdqarHtb"
+}
+declare_id!(id_str());
 
 entrypoint!(process_instruction);

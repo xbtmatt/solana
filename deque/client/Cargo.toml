@@ -8,9 +8,13 @@ anyhow = { workspace = true }
 borsh = { workspace = true }
 bytemuck = { workspace = true }
 deque = { path = "../program", features = ["no-entrypoint"] }
+itertools = "0.14.0"
+serde = "1.0.226"
 solana-client = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
+solana-system-interface = { version = "2.0.0", features = ["bincode"] }
+solana-transaction-status = "2.3.10"
 spl-associated-token-account = { workspace = true }
 spl-token = { workspace = true }
 spl-token-2022 = { workspace = true }

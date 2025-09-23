@@ -1,13 +1,13 @@
 use anyhow::Context;
 use deque::{instruction_enum::DequeInstruction, seeds};
 use solana_client::{client_error::ClientError, rpc_client::RpcClient};
+use solana_program::system_program;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
     instruction::{AccountMeta, Instruction},
     message::Message,
     pubkey::Pubkey,
     signature::{Keypair, Signature, Signer},
-    system_program,
     transaction::Transaction,
 };
 
@@ -96,7 +96,7 @@ pub fn send_deposit_or_withdraw(
     mint: Pubkey,
     vault_ata: Pubkey,
     deque_instruction: &DequeInstruction,
-) -> Result<ParsedTransaction, ClientError> {
+) -> Result<Signature, ClientError> {
     println!(
         "BEFORE: payer, vault: ({}, {})",
         get_token_balance(rpc, &payer.pubkey(), &mint),

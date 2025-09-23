@@ -1,3 +1,4 @@
+use anyhow::Context;
 use deque::instruction_enum::{
     DepositInstructionData, DequeInstruction, MarketChoice, WithdrawInstructionData,
 };
@@ -15,16 +16,16 @@ use solana_sdk::{
 use spl_associated_token_account::get_associated_token_address;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     // Connect to local cluster
     let rpc_url = String::from("http://localhost:8899");
     let rpc = RpcClient::new_with_commitment(rpc_url, CommitmentConfig::confirmed());
 
     let payer = fund_account(&rpc, None).await.expect("Should fund account");
-    test_market_escrow(&rpc, &payer);
+    test_market_escrow(&rpc, &payer).context("Market escrow test failed")
 }
 
-fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
+fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
     // ----------------------- Mint two tokens and generate deque address --------------------------
     let ctx = generate_market(rpc, payer).expect("Should be able to generate deque");
     let payer_base_ata = get_associated_token_address(&payer.pubkey(), &ctx.base_mint);
@@ -48,7 +49,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
         ],
         "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
     )
-    .expect("Should initialize");
+    .context("Should initialize")?;
 
     // ----------------------------------------- Deposit -------------------------------------------
     send_deposit_or_withdraw(
@@ -63,7 +64,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             choice: MarketChoice::Base,
         }),
     )
-    .map(parse_txn);
+    .map(|sig| parse_txn(rpc, sig).context("Couldn't parse withdraw txn"))
+    .context("Couldn't withdraw base.")??;
 
     // ----------------------------------------- Withdraw -------------------------------------------
     send_deposit_or_withdraw(
@@ -77,7 +79,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             choice: MarketChoice::Base,
         }),
     )
-    .map(parse_txn);
+    .map(|sig| parse_txn(rpc, sig).context("Couldn't parse deposit txn"))
+    .context("Couldn't withdraw base")??;
 
     // ------------------------------------------- Fuzz --------------------------------------------
     const ROUNDS: u64 = 10;
@@ -104,7 +107,8 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
                     amount,
                     choice: MarketChoice::Base,
                 }),
-            );
+            )
+            .context("Couldn't deposit base")?;
         }
 
         // Exactly one withdraw after ≥1 deposits
@@ -118,10 +122,13 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) {
             &DequeInstruction::Withdraw(WithdrawInstructionData {
                 choice: MarketChoice::Base,
             }),
-        );
+        )
+        .context("Couldn't withdraw base")?;
 
         println!("Expected withdrawn: {}", expected);
     }
 
     print_size_and_sectors(rpc, &ctx.deque_pubkey);
+
+    Ok(())
 }

@@ -1,3 +1,4 @@
+pub mod ellipsis_transaction_utils;
 pub mod events;
 pub mod logs;
 pub mod tokens;

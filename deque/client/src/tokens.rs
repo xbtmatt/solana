@@ -11,6 +11,7 @@ use solana_sdk::{
     signature::{Keypair, Signer},
     system_instruction, system_program,
 };
+
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::state::Mint;
 
@@ -67,14 +68,14 @@ pub fn create_token(
         &[&mint],
         vec![create_mint, init_mint],
         "--- create and initialize mint ---".to_string(),
-    );
+    )?;
     send_txn(
         rpc,
         payer,
         &[payer],
         vec![create_ata, mint_to],
         "--- create ATA and mint to it".to_string(),
-    );
+    )?;
 
     Ok((mint.pubkey(), payer_ata))
 }

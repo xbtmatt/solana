@@ -12,3 +12,7 @@ pub fn print_size_and_sectors(client: &RpcClient, account_pubkey: &Pubkey) {
         );
     }
 }
+
+pub fn bytes_to_str(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
