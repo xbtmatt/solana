@@ -88,11 +88,7 @@ pub fn process(
         }
     }
 
-    msg!("depositing------------------------------------ to event emitter");
-    msg!("{:?}", event_emitter.emit_instruction.data);
     event_emitter.add_event(DepositEventData::new(ctx.payer.key, amount, choice))?;
-    msg!("{:?}", event_emitter.emit_instruction.data);
-    msg!("DONE  depositing-------------------------");
 
     Ok(())
 }
