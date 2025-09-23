@@ -32,6 +32,7 @@ impl TryFrom<u8> for EventTag {
 }
 
 #[cfg(not(target_os = "solana"))]
+#[derive(Clone, Copy, Debug)]
 pub enum DequeEvent<'p> {
     Header(HeaderEventData<'p>),
     // Initialize(InitializeEventData),
@@ -105,6 +106,7 @@ pub trait EmittableEvent: Sized {
     }
 }
 
+#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug))]
 pub struct HeaderEventData<'p> {
     pub discriminant: u8,
     pub instruction_tag: InstructionTag,
@@ -166,6 +168,7 @@ impl<'p> HeaderEventData<'p> {
     }
 }
 
+#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug))]
 pub struct DepositEventData<'p> {
     pub discriminant: u8,
     pub trader: &'p Pubkey,
@@ -210,6 +213,7 @@ impl EmittableEvent for DepositEventData<'_> {
 }
 
 #[repr(C)]
+#[cfg_attr(not(target_os = "solana"), derive(Clone, Copy, Debug))]
 pub struct WithdrawEventData<'p> {
     pub discriminant: u8,
     pub trader: &'p Pubkey,

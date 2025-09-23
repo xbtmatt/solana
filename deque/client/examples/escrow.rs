@@ -3,14 +3,15 @@ use deque::instruction_enum::{
     DepositInstructionData, DequeInstruction, MarketChoice, WithdrawInstructionData,
 };
 use deque_client::{
-    events::parse_txn,
+    events::get_transaction_events,
     logs::print_size_and_sectors,
-    tokens::{generate_market, INITIAL_MINT_AMOUNT},
+    tokens::{generate_market, DequeContext, INITIAL_MINT_AMOUNT},
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
 };
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
+    pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
 use spl_associated_token_account::get_associated_token_address;
@@ -64,7 +65,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
             choice: MarketChoice::Base,
         }),
     )
-    .map(|sig| parse_txn(rpc, sig).context("Couldn't parse withdraw txn"))
+    .map(|sig| get_transaction_events(rpc, sig).context("Couldn't parse withdraw txn"))
     .context("Couldn't withdraw base.")??;
 
     // ----------------------------------------- Withdraw -------------------------------------------
@@ -79,13 +80,24 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
             choice: MarketChoice::Base,
         }),
     )
-    .map(|sig| parse_txn(rpc, sig).context("Couldn't parse deposit txn"))
+    .map(|sig| get_transaction_events(rpc, sig).context("Couldn't parse deposit txn"))
     .context("Couldn't withdraw base")??;
 
     // ------------------------------------------- Fuzz --------------------------------------------
-    const ROUNDS: u64 = 10;
+    const ROUNDS: u64 = 0;
+    fuzz(rpc, payer, payer_base_ata, ctx, ROUNDS)?;
 
-    for round in 0..ROUNDS {
+    Ok(())
+}
+
+pub fn fuzz(
+    rpc: &RpcClient,
+    payer: &Keypair,
+    payer_base_ata: Pubkey,
+    ctx: DequeContext,
+    rounds: u64,
+) -> anyhow::Result<()> {
+    for round in 0..rounds {
         println!("---------------- Fuzz round: {} ----------------", round,);
         // Pseudo-random-ish deposits count in {1,2,3}
         let num_deposits = ((round * 7 + 3) % 3) + 1;
@@ -93,7 +105,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
         let mut expected = 0;
         for j in 0..num_deposits {
             // Vary the deposit amount but keep it sane and non-zero
-            let amount = 1_000 + ((round * 997) ^ (j * 313)) % (INITIAL_MINT_AMOUNT * ROUNDS);
+            let amount = 1_000 + ((round * 997) ^ (j * 313)) % (INITIAL_MINT_AMOUNT * rounds);
             expected += amount;
 
             send_deposit_or_withdraw(

@@ -1,4 +1,4 @@
-use std::{os::raw, str::FromStr};
+use std::str::FromStr;
 
 use anyhow::Context;
 use deque::{events::DequeEvent, instruction_enum::InstructionTag};
@@ -6,14 +6,11 @@ use itertools::Itertools;
 use solana_sdk::{commitment_config::CommitmentConfig, signature::Signature};
 use solana_transaction_status::UiTransactionEncoding;
 
-use crate::{
-    ellipsis_transaction_utils::{
-        parse_transaction, ParsedInnerInstruction, ParsedInstruction, ParsedTransaction,
-    },
-    logs::bytes_to_str,
+use crate::ellipsis_transaction_utils::{
+    parse_transaction, ParsedInnerInstruction, ParsedTransaction,
 };
 
-pub fn parse_txn(
+pub fn get_transaction_events(
     rpc: &solana_client::rpc_client::RpcClient,
     sig: Signature,
 ) -> anyhow::Result<Vec<DequeEvent<'_>>> {
@@ -34,45 +31,32 @@ pub fn parse_txn(
     Ok(vec![])
 }
 
-pub fn parse_events(tx: &ParsedTransaction) -> anyhow::Result<Vec<u8>> {
+pub fn parse_events(tx: &ParsedTransaction) -> anyhow::Result<Vec<DequeEvent<'_>>> {
     let _sig = Signature::from_str(&tx.signature)
         .ok()
         .context("Couldn't convert signature to string");
 
-    let event_bytes = tx
+    let events = tx
         .inner_instructions
         .iter()
-        .flat_map(|inner_ixns| {
-            inner_ixns
-                .iter()
-                .filter_map(|ParsedInnerInstruction { instruction, .. }| {
-                    maybe_deque_event_bytes(instruction)
-                })
-        })
         .flatten()
+        .filter_map(maybe_unpack_event)
         .collect_vec();
 
-    println!("event bytes: {:?}", event_bytes);
-    println!("----------------------------------------------------------------------\n");
-
-    // TODO: Iterate over the flattened vecs (or unflatten them? to parse them as Vec<Vec<u8>> separately)
-    // and parse event data per the bytes.
-
-    Ok(event_bytes)
+    Ok(events)
 }
 
-pub fn maybe_deque_event_bytes(ixn: &ParsedInstruction) -> Option<Vec<u8>> {
-    if ixn.data.is_empty() || ixn.program_id.as_str() != deque::id_str() {
+pub fn maybe_unpack_event(inner_ixn: &ParsedInnerInstruction) -> Option<DequeEvent<'_>> {
+    let ixn = &inner_ixn.instruction;
+
+    if ixn.program_id.as_str() != deque::id_str() {
         return None;
     };
 
-    ixn.data.split_first().and_then(|(tag, data)| {
-        InstructionTag::try_from(*tag).ok().and_then(|t| {
-            if matches!(t, InstructionTag::FlushEventLog) {
-                Some(data.to_vec())
-            } else {
-                None
-            }
-        })
-    })
+    let (tag, data) = ixn.data.split_first()?;
+    let instruction_tag = InstructionTag::try_from(*tag).ok()?;
+
+    matches!(instruction_tag, InstructionTag::FlushEventLog)
+        .then(|| DequeEvent::unpack(data).ok())
+        .flatten()
 }
