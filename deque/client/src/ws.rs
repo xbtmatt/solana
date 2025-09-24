@@ -47,19 +47,11 @@ pub async fn subscribe_program_and_send() -> Result<()> {
         while let Some(account) = stream.next().await {
             // Technically this could be the `_unchecked` version of this call since we filtered by
             // the discriminant already, but it's a simple extra check.
-
-            // let mut data = account.value.account.data.decode();
-            // if let Some(bytes) = data {
-            //     let deque =
-            //         Deque::new_from_bytes(&mut bytes.to_owned()).expect("Should convert to deque!");
-            //     println!()
-            // }
             account.value.account.data.decode().inspect(|bytes| {
                 if let Ok(deque) = Deque::new_from_bytes(&mut bytes.to_owned()) {
                     println!("{deque:#?}");
                 };
             });
-            // .inspect(|mut bytes| println!("{:?}", Deque::new_from_bytes(&mut bytes)));
         }
     });
 
