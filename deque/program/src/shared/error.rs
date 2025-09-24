@@ -37,9 +37,19 @@ pub enum DequeError {
     InvalidMarketChoice,
     InvalidNumberOfAccounts,
     InsufficientVecCapacity,
+    MalformedDeque,
+    InvalidSectorIndex,
+    ArithmetricError,
+    AccountNotOwnedByProgram,
+    AccountIsNotWritable,
+    InvalidPDA,
+    MustBeGreaterThanOne,
+    NoActiveEscrow,
+    OutOfBounds,
 }
 
 impl From<DequeError> for ProgramError {
+    #[inline(always)]
     fn from(e: DequeError) -> Self {
         ProgramError::Custom(e as u32)
     }
@@ -53,6 +63,15 @@ impl From<DequeError> for &'static str {
             DequeError::InvalidMarketChoice => "Invalid market choice",
             DequeError::InvalidNumberOfAccounts => "Invalid number of accounts passed",
             DequeError::InsufficientVecCapacity => "Insufficient vec.capacity()",
+            DequeError::MalformedDeque => "Malformed deque data",
+            DequeError::InvalidSectorIndex => "Invalid sector index",
+            DequeError::ArithmetricError => "Checked arithmetic failed",
+            DequeError::AccountIsNotWritable => "Account is not writable",
+            DequeError::AccountNotOwnedByProgram => "Account is not owned by this program",
+            DequeError::InvalidPDA => "Program derived address did not match input",
+            DequeError::MustBeGreaterThanOne => "Argument is not >= 1",
+            DequeError::NoActiveEscrow => "Trader has no active escrow",
+            DequeError::OutOfBounds => "Index is out of bounds",
         }
     }
 }

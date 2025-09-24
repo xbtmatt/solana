@@ -7,10 +7,11 @@ use solana_program::{
 
 use crate::{
     seeds,
+    shared::error::DequeError,
     state::{Deque, DequeNode, MarketEscrow, Stack, HEADER_FIXED_SIZE},
 };
 
-/// The ordinal `sector` index in the slab of bytes dedicated to inner data for a type.
+/// The physical `sector` index in the slab of bytes dedicated to inner data for a type.
 /// That is, to get the raw bytes offset, it is multiplied by the sector type's sector size.
 pub type SectorIndex = u32;
 pub const NIL: SectorIndex = SectorIndex::MAX;
@@ -41,9 +42,13 @@ pub trait Slab: bytemuck::Pod {}
 
 #[inline(always)]
 pub fn from_slab_bytes<T: Slab>(data: &[u8], byte_offset: usize) -> Result<&T, ProgramError> {
-    let i = byte_offset;
-    bytemuck::try_from_bytes(&data[i..i + std::mem::size_of::<T>()])
-        .map_err(|_| ProgramError::InvalidAccountData)
+    // TODO: Optimize this to use `get_unchecked` with a prior safety check on the data/buffer size.
+    let size = core::mem::size_of::<T>();
+    let end = byte_offset
+        .checked_add(size)
+        .ok_or(DequeError::ArithmetricError)?;
+    let bytes = data.get(byte_offset..end).ok_or(DequeError::OutOfBounds)?;
+    bytemuck::try_from_bytes(bytes).map_err(|_| DequeError::MalformedDeque.into())
 }
 
 #[inline(always)]
@@ -51,20 +56,26 @@ pub fn from_slab_bytes_mut<T: Slab>(
     data: &mut [u8],
     byte_offset: usize,
 ) -> Result<&mut T, ProgramError> {
-    let i = byte_offset;
-    bytemuck::try_from_bytes_mut(&mut data[i..i + std::mem::size_of::<T>()])
-        .map_err(|_| ProgramError::InvalidAccountData)
+    // TODO: Optimize this to use `get_unchecked` with a prior safety check on the data/buffer size.
+    let size = core::mem::size_of::<T>();
+    let end = byte_offset
+        .checked_add(size)
+        .ok_or(DequeError::ArithmetricError)?;
+    let bytes = data
+        .get_mut(byte_offset..end)
+        .ok_or(DequeError::OutOfBounds)?;
+    bytemuck::try_from_bytes_mut(bytes).map_err(|_| DequeError::MalformedDeque.into())
 }
 
 #[inline(always)]
 pub fn from_sector_idx<T: Slab>(sectors: &[u8], idx: SectorIndex) -> Result<&T, ProgramError> {
     if idx == NIL {
-        return Err(ProgramError::InvalidAccountData);
+        return Err(DequeError::InvalidSectorIndex.into());
     }
     let stride = size_of::<T>();
     let start = (idx as usize)
         .checked_mul(stride)
-        .ok_or(ProgramError::InvalidAccountData)?;
+        .ok_or(DequeError::ArithmetricError)?;
     from_slab_bytes(sectors, start)
 }
 
@@ -74,12 +85,12 @@ pub fn from_sector_idx_mut<T: Slab>(
     idx: SectorIndex,
 ) -> Result<&mut T, ProgramError> {
     if idx == NIL {
-        return Err(ProgramError::InvalidAccountData);
+        return Err(DequeError::InvalidSectorIndex.into());
     }
     let stride = size_of::<T>();
     let start = (idx as usize)
         .checked_mul(stride)
-        .ok_or(ProgramError::InvalidAccountData)?;
+        .ok_or(DequeError::ArithmetricError)?;
     from_slab_bytes_mut(sectors, start)
 }
 
@@ -91,14 +102,12 @@ pub fn log_bytes(bytes: &[u8]) {
 #[inline(always)]
 pub fn check_owned_and_writable(account: &AccountInfo) -> ProgramResult {
     if account.owner.as_ref() != crate::ID.as_ref() {
-        msg!("account not owned by program");
-        return Err(ProgramError::IncorrectProgramId);
+        Err(DequeError::AccountNotOwnedByProgram.into())
+    } else if !account.is_writable {
+        Err(DequeError::AccountIsNotWritable.into())
+    } else {
+        Ok(())
     }
-    if !account.is_writable {
-        msg!("account not writable");
-        return Err(ProgramError::InvalidAccountData);
-    }
-    Ok(())
 }
 
 #[inline(always)]
@@ -106,12 +115,12 @@ pub fn check_derivations_and_get_bump(
     deque_account: &AccountInfo,
     base_mint: &Pubkey,
     quote_mint: &Pubkey,
-) -> Result<u8, ProgramError> {
+) -> Result<u8, DequeError> {
     // TODO: Determine if this is necessary. It's possible the bump can be passed and then the
     // attempted invoke signed should just not work if it's inaccurate..?
     let (deque_pub, deque_bump) = seeds::market::find_market_address(base_mint, quote_mint);
     if deque_pub.as_ref() != deque_account.key.as_ref() {
-        return Err(ProgramError::InvalidAccountData);
+        return Err(DequeError::InvalidPDA);
     }
 
     Ok(deque_bump)
@@ -125,7 +134,7 @@ pub fn inline_resize<'a, 'info>(
     num_sectors: u16,
 ) -> ProgramResult {
     if num_sectors < 1 {
-        return Err(ProgramError::InvalidArgument);
+        return Err(DequeError::MustBeGreaterThanOne.into());
     }
     check_owned_and_writable(deque_account)?;
 

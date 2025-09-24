@@ -3,6 +3,7 @@ use solana_program::{entrypoint::ProgramResult, msg, program_error::ProgramError
 use static_assertions::const_assert_eq;
 
 use crate::{
+    shared::error::DequeError,
     state::{DequeHeader, MarketEscrow, Stack, StackNode, HEADER_FIXED_SIZE},
     utils::{
         from_sector_idx, from_sector_idx_mut, from_slab_bytes_mut, SectorIndex, Slab, NIL,
@@ -146,38 +147,40 @@ impl<'a> Deque<'a> {
         Ok(new_idx)
     }
 
-    pub fn remove<P: Pod + Zeroable + core::fmt::Debug>(
+    /// Remove by an ordinal/logical index in the deque.
+    /// That is, remove at the *logical* index in the deque, not the *physical* index in memory.
+    pub fn remove_at_logical_idx<P: Pod + Zeroable + core::fmt::Debug>(
         &mut self,
-        pos: SectorIndex,
+        logical_idx: u32,
     ) -> Result<P, ProgramError> {
         let len = self.header.len;
-        if pos >= len {
-            return Err(ProgramError::InvalidArgument);
+        if logical_idx >= len {
+            return Err(DequeError::OutOfBounds.into());
         }
 
         // Pick the closer direction, grab the sector index
-        let idx = if pos <= len / 2 {
-            self.iter_indices::<P>().nth(pos as usize)
+        let idx = if logical_idx <= len / 2 {
+            self.iter_indices::<P>().nth(logical_idx as usize)
         } else {
-            self.iter_indices_rev::<P>().nth((len - 1 - pos) as usize)
+            self.iter_indices_rev::<P>()
+                .nth((len - 1 - logical_idx) as usize)
         }
         .ok_or(ProgramError::InvalidAccountData)?;
 
-        self.remove_at_sector::<P>(idx)
+        self.remove_at_sector_idx::<P>(idx)
     }
 
-    pub fn remove_at_sector<P: Pod + Zeroable + core::fmt::Debug>(
+    pub fn remove_at_sector_idx<P: Pod + Zeroable + core::fmt::Debug>(
         &mut self,
-        pos: SectorIndex,
+        idx: SectorIndex,
     ) -> Result<P, ProgramError> {
-        msg!("removing element at {}", pos);
-        let len = self.header.len;
-        if pos == NIL || pos >= len {
+        msg!("removing element at {}", idx);
+        if idx == NIL {
             return Err(ProgramError::InvalidInstructionData);
         };
 
         let (prev, next, inner) = {
-            let n: &DequeNode<P> = from_sector_idx::<DequeNode<P>>(self.sectors, pos)?;
+            let n: &DequeNode<P> = from_sector_idx::<DequeNode<P>>(self.sectors, idx)?;
             (n.prev, n.next, n.inner)
         };
 
@@ -192,8 +195,9 @@ impl<'a> Deque<'a> {
         }
 
         self.header.len = self.header.len.saturating_sub(1);
+        msg!("Header len just updated TO: {}", self.header.len);
         let mut free = Stack::<P>::new(self.sectors, self.header.free_head);
-        free.push_to_free(pos)?;
+        free.push_to_free(idx)?;
         self.header.free_head = free.get_head();
         Ok(inner)
     }

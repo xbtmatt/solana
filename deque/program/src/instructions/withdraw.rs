@@ -7,7 +7,7 @@ use crate::{
     context::market_choice::MarketChoiceContext,
     events::{event_emitter::EventEmitter, WithdrawEventData},
     instruction_enum::MarketChoice,
-    shared::token_utils::vault_transfers::withdraw_from_vault,
+    shared::{error::DequeError, token_utils::vault_transfers::withdraw_from_vault},
     state::{Deque, DequeNode, MarketEscrow},
     utils::from_sector_idx_mut,
 };
@@ -54,8 +54,8 @@ pub fn process(
             if escrow.amount_of_opposite_choice(&ctx.choice) == 0 {
                 msg!("Both amounts are 0. Removing node from the deque!");
                 deque
-                    .remove::<MarketEscrow>(idx)
-                    .map_err(|_| ProgramError::InvalidAccountData)?;
+                    .remove_at_sector_idx::<MarketEscrow>(idx)
+                    .expect("The deque node sector index was just found and should exist");
             } else {
                 // Otherwise, just zero out the one that was just withdrawn.
                 msg!("Zeroing out the token that was withdrawn.");
@@ -67,12 +67,10 @@ pub fn process(
             }
 
             msg!("Withdrawing {} coins", amount);
-
             amount
         }
         None => {
-            msg!("Trader has no active escrow");
-            return Err(ProgramError::InvalidArgument);
+            return Err(DequeError::NoActiveEscrow.into());
         }
     };
 
