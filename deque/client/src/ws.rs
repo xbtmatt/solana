@@ -50,7 +50,9 @@ pub async fn subscribe_program_and_send() -> Result<()> {
             account.value.account.data.decode().inspect(|bytes| {
                 if let Ok(deque) = Deque::new_from_bytes(&mut bytes.to_owned()) {
                     println!("{deque:#?}");
-                };
+                } else {
+                    println!("Failed to unpack deque account.");
+                }
             });
         }
     });
