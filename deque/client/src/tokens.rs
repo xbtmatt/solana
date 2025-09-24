@@ -98,6 +98,7 @@ pub fn get_token_balance(rpc: &RpcClient, owner: &Pubkey, mint: &Pubkey) -> u64 
     token_account.amount
 }
 
+#[derive(Clone)]
 pub struct DequeContext {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,

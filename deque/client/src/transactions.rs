@@ -72,11 +72,21 @@ pub fn send_txn(
 
     match rpc.send_and_confirm_transaction(&tx) {
         Ok(sig) => {
-            println!("✓: Called {}, {}", txn_label, sig);
+            println!(
+                "✓: Called {} for payer: {}, sig: {}",
+                txn_label,
+                payer.pubkey(),
+                sig
+            );
             Ok(sig)
         }
         Err(e) => {
-            eprintln!("Failed to call {}: {}", txn_label, e);
+            eprintln!(
+                "❌: Failed call: {} for payer: {}, err: {}",
+                txn_label,
+                payer.pubkey(),
+                e
+            );
             Err(e).context("Failed to call")
         }
     }
@@ -97,17 +107,19 @@ pub fn send_deposit_or_withdraw(
     vault_ata: Pubkey,
     deque_instruction: &DequeInstruction,
 ) -> anyhow::Result<Signature> {
-    let label = match deque_instruction {
-        DequeInstruction::Deposit(_) => "deposit",
-        DequeInstruction::Withdraw(_) => "withdraw",
+    let (label, amount, side) = match deque_instruction {
+        DequeInstruction::Deposit(dep) => ("deposit", Some(dep.amount as i64), dep.choice),
+        DequeInstruction::Withdraw(wd) => ("withdraw", None, wd.choice),
         _ => panic!("Instruction must be deposit or withdraw."),
     };
 
     println!(
-        "BEFORE {}: payer, vault: ({}, {})",
+        "BEFORE {}: payer, vault: ({}, {}), amount, side: ({}, {:?})",
         label,
         get_token_balance(rpc, &payer.pubkey(), &mint),
-        get_token_balance(rpc, &deque_pubkey, &mint)
+        get_token_balance(rpc, &deque_pubkey, &mint),
+        amount.unwrap_or(-1),
+        side,
     );
 
     let ixn = Instruction {

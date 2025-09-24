@@ -121,7 +121,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
 
     // ------------------------------------------- Fuzz --------------------------------------------
     const ROUNDS: u64 = 0;
-    fuzz(rpc, payer, ctx, ROUNDS)?;
+    fuzz(rpc, payer, &ctx, ROUNDS, None)?;
 
     Ok(())
 }

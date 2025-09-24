@@ -8,7 +8,9 @@ anyhow = { workspace = true }
 borsh = { workspace = true }
 bytemuck = { workspace = true }
 deque = { path = "../program", features = ["no-entrypoint"] }
+futures = "0.3.31"
 itertools = "0.14.0"
+rand = "0.9.2"
 serde = "1.0.226"
 solana-account-decoder-client-types = "2.3.10"
 solana-client = { workspace = true }
