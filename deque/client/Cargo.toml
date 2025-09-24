@@ -10,6 +10,7 @@ bytemuck = { workspace = true }
 deque = { path = "../program", features = ["no-entrypoint"] }
 itertools = "0.14.0"
 serde = "1.0.226"
+solana-account-decoder-client-types = "2.3.10"
 solana-client = { workspace = true }
 solana-program = { workspace = true }
 solana-sdk = { workspace = true }
@@ -19,6 +20,5 @@ spl-associated-token-account = { workspace = true }
 spl-token = { workspace = true }
 spl-token-2022 = { workspace = true }
 static_assertions = { workspace = true }
-
-[dev-dependencies]
-tokio = { workspace = true }
+tokio.workspace = true
+tokio-stream = "0.1.17"

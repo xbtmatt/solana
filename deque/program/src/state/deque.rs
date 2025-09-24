@@ -90,7 +90,7 @@ impl<'a> Deque<'a> {
         Ok(Self { header, sectors })
     }
 
-    pub fn push_front<P: Pod + Zeroable + std::fmt::Debug>(
+    pub fn push_front<P: Pod + Zeroable + core::fmt::Debug>(
         &mut self,
         value: P,
     ) -> Result<SectorIndex, ProgramError> {
@@ -146,7 +146,7 @@ impl<'a> Deque<'a> {
         Ok(new_idx)
     }
 
-    pub fn remove<P: Pod + Zeroable + std::fmt::Debug>(
+    pub fn remove<P: Pod + Zeroable + core::fmt::Debug>(
         &mut self,
         pos: SectorIndex,
     ) -> Result<P, ProgramError> {
@@ -166,7 +166,7 @@ impl<'a> Deque<'a> {
         self.remove_at_sector::<P>(idx)
     }
 
-    pub fn remove_at_sector<P: Pod + Zeroable + std::fmt::Debug>(
+    pub fn remove_at_sector<P: Pod + Zeroable + core::fmt::Debug>(
         &mut self,
         pos: SectorIndex,
     ) -> Result<P, ProgramError> {
@@ -228,5 +228,27 @@ impl<'a> Deque<'a> {
             (node.prev != NIL).then_some(node.prev)
         })
         .take(self.header.len as usize)
+    }
+}
+
+#[cfg(not(target_os = "solana"))]
+impl<'a> core::fmt::Debug for Deque<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let items: Vec<_> = self
+            .iter_indices::<MarketEscrow>()
+            .filter_map(|idx| {
+                from_sector_idx::<DequeNode<MarketEscrow>>(self.sectors, idx)
+                    .ok()
+                    .map(|node| node.inner)
+            })
+            .collect();
+
+        f.debug_struct("Deque")
+            .field("len", &self.header.len)
+            .field("deque_head", &self.header.deque_head)
+            .field("deque_tail", &self.header.deque_tail)
+            .field("free_head", &self.header.free_head)
+            .field("items", &items)
+            .finish()
     }
 }

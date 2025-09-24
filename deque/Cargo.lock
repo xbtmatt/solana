@@ -973,6 +973,7 @@ dependencies = [
  "deque",
  "itertools 0.14.0",
  "serde",
+ "solana-account-decoder-client-types",
  "solana-client",
  "solana-program",
  "solana-sdk",
@@ -983,6 +984,7 @@ dependencies = [
  "spl-token-2022 9.0.0",
  "static_assertions",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

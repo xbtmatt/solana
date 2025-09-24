@@ -4,15 +4,15 @@ use deque::instruction_enum::{
 };
 use deque_client::{
     events::fetch_parsed_txn,
-    logs::print_size_and_sectors,
-    tokens::{generate_market, DequeContext, INITIAL_MINT_AMOUNT},
+    fuzz::fuzz,
+    initialize::initialize_deque_with_ctx,
+    tokens::generate_market,
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
 };
 use itertools::Itertools;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    pubkey::Pubkey,
     signature::{Keypair, Signer},
 };
 use spl_associated_token_account::get_associated_token_address;
@@ -39,19 +39,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
     println!("payer_base_ata {:#?}", payer_base_ata.to_string());
 
     // ------------------------------------- Initialization ----------------------------------------
-    // Create both payer ATAs.
-    send_txn(
-        rpc,
-        payer,
-        &[payer],
-        vec![
-            ctx.create_ata_ixn(payer, MarketChoice::Base),
-            ctx.create_ata_ixn(payer, MarketChoice::Quote),
-            ctx.initialize_deque_ixn(payer, 0),
-        ],
-        "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
-    )
-    .context("Should initialize")?;
+    initialize_deque_with_ctx(rpc, payer, &ctx)?;
 
     // ------------------------------ Deposit base, base, quote --------------------------------
 
@@ -133,62 +121,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
 
     // ------------------------------------------- Fuzz --------------------------------------------
     const ROUNDS: u64 = 0;
-    fuzz(rpc, payer, payer_base_ata, ctx, ROUNDS)?;
-
-    Ok(())
-}
-
-pub fn fuzz(
-    rpc: &RpcClient,
-    payer: &Keypair,
-    payer_base_ata: Pubkey,
-    ctx: DequeContext,
-    rounds: u64,
-) -> anyhow::Result<()> {
-    for round in 0..rounds {
-        println!("---------------- Fuzz round: {} ----------------", round,);
-        // Pseudo-random-ish deposits count in {1,2,3}
-        let num_deposits = ((round * 7 + 3) % 3) + 1;
-
-        let mut expected = 0;
-        for j in 0..num_deposits {
-            // Vary the deposit amount but keep it sane and non-zero
-            let amount = 1_000 + ((round * 997) ^ (j * 313)) % (INITIAL_MINT_AMOUNT * rounds);
-            expected += amount;
-
-            send_deposit_or_withdraw(
-                rpc,
-                payer,
-                ctx.deque_pubkey,
-                payer_base_ata,
-                ctx.base_mint,
-                ctx.vault_base_ata,
-                &DequeInstruction::Deposit(DepositInstructionData {
-                    amount,
-                    choice: MarketChoice::Base,
-                }),
-            )
-            .context("Couldn't deposit base")?;
-        }
-
-        // Exactly one withdraw after ≥1 deposits
-        send_deposit_or_withdraw(
-            rpc,
-            payer,
-            ctx.deque_pubkey,
-            payer_base_ata,
-            ctx.base_mint,
-            ctx.vault_base_ata,
-            &DequeInstruction::Withdraw(WithdrawInstructionData {
-                choice: MarketChoice::Base,
-            }),
-        )
-        .context("Couldn't withdraw base")?;
-
-        println!("Expected withdrawn: {}", expected);
-    }
-
-    print_size_and_sectors(rpc, &ctx.deque_pubkey);
+    fuzz(rpc, payer, ctx, ROUNDS)?;
 
     Ok(())
 }
