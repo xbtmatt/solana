@@ -8,7 +8,7 @@ use solana_program::{
 use crate::{
     seeds,
     shared::error::DequeError,
-    state::{Deque, DequeNode, MarketEscrow, Stack, HEADER_FIXED_SIZE},
+    state::{Deque, DequeNode, MarketEscrow, Stack, DEQUE_HEADER_SIZE},
 };
 
 /// The physical `sector` index in the slab of bytes dedicated to inner data for a type.
@@ -48,7 +48,7 @@ pub fn from_slab_bytes<T: Slab>(data: &[u8], byte_offset: usize) -> Result<&T, P
         .checked_add(size)
         .ok_or(DequeError::ArithmetricError)?;
     let bytes = data.get(byte_offset..end).ok_or(DequeError::OutOfBounds)?;
-    bytemuck::try_from_bytes(bytes).map_err(|_| DequeError::MalformedDeque.into())
+    bytemuck::try_from_bytes(bytes).map_err(|_| DequeError::MalformedSlab.into())
 }
 
 #[inline(always)]
@@ -64,7 +64,7 @@ pub fn from_slab_bytes_mut<T: Slab>(
     let bytes = data
         .get_mut(byte_offset..end)
         .ok_or(DequeError::OutOfBounds)?;
-    bytemuck::try_from_bytes_mut(bytes).map_err(|_| DequeError::MalformedDeque.into())
+    bytemuck::try_from_bytes_mut(bytes).map_err(|_| DequeError::MalformedSlab.into())
 }
 
 #[inline(always)]
@@ -164,9 +164,9 @@ pub fn inline_resize<'a, 'info>(
 
     // Now chain the old sectors to the new sectors in the stack of free nodes.
     let mut deque_data = deque_account.data.borrow_mut();
-    let deque = Deque::new_from_bytes_unchecked(&mut deque_data)?;
+    let deque = Deque::from_bytes_unchecked(&mut deque_data)?;
 
-    let curr_n_sectors = (current_size - HEADER_FIXED_SIZE) / SECTOR_SIZE;
+    let curr_n_sectors = (current_size - DEQUE_HEADER_SIZE) / SECTOR_SIZE;
     let new_n_sectors = curr_n_sectors + num_sectors as usize;
 
     let mut free = Stack::<MarketEscrow>::new(deque.sectors, deque.header.free_head);

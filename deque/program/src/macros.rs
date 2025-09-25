@@ -22,10 +22,10 @@ macro_rules! market_seeds_with_bump {
 }
 
 #[macro_export]
-macro_rules! impl_discriminants {
+macro_rules! impl_tags {
     ( $( $ty:ty => $tag:path ),+ $(,)? ) => {
         $(
-            impl $crate::pack::Discriminant for $ty {
+            impl $crate::pack::Tagged for $ty {
                 const TAG: u8 = $tag as u8;
             }
         )+

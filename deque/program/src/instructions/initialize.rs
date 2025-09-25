@@ -7,7 +7,7 @@ use crate::{
     context::initialize_deque::InitializeDequeContext,
     market_seeds_with_bump,
     shared::token_utils::create_vault::create_token_vault,
-    state::{Deque, HEADER_FIXED_SIZE},
+    state::{Deque, DEQUE_HEADER_SIZE},
     utils::SECTOR_SIZE,
 };
 
@@ -16,7 +16,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) 
 
     let ctx = InitializeDequeContext::load(accounts)?;
 
-    let account_space = HEADER_FIXED_SIZE + SECTOR_SIZE * (num_sectors as usize);
+    let account_space = DEQUE_HEADER_SIZE + SECTOR_SIZE * (num_sectors as usize);
     let lamports_required = Rent::get()?.minimum_balance(account_space);
 
     // Create the deque PDA.
@@ -53,7 +53,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) 
 
     {
         let mut data = ctx.deque_account.try_borrow_mut_data()?;
-        Deque::init_deque_account(
+        Deque::init(
             &mut data,
             num_sectors,
             ctx.market_bump,

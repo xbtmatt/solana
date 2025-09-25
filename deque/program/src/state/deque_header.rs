@@ -1,15 +1,18 @@
-use crate::utils::{SectorIndex, Slab, NIL};
+use crate::{
+    shared::error::DequeError,
+    utils::{SectorIndex, Slab, NIL},
+};
 use bytemuck::{Pod, Zeroable};
-use solana_program::{entrypoint::ProgramResult, program_error::ProgramError, pubkey::Pubkey};
+use solana_program::{entrypoint::ProgramResult, pubkey::Pubkey};
 use static_assertions::const_assert_eq;
 
-pub const DEQUE_ACCOUNT_DISCRIMINANT: u64 = 0xf00dbabe;
-pub const HEADER_FIXED_SIZE: usize = 96;
+pub const DEQUE_ACCOUNT_DISCRIMINANT: [u8; 8] = 0xd00d00b00b00f00du64.to_le_bytes();
+pub const DEQUE_HEADER_SIZE: usize = 96;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Zeroable)]
 pub struct DequeHeader {
-    pub discriminant: u64,
+    pub discriminant: [u8; 8],
     pub len: SectorIndex,
     pub free_head: SectorIndex,
     pub deque_head: SectorIndex,
@@ -27,7 +30,7 @@ unsafe impl Pod for DequeHeader {}
 impl Slab for DequeHeader {}
 
 impl DequeHeader {
-    pub fn new_empty(deque_bump: u8, base_mint: &Pubkey, quote_mint: &Pubkey) -> Self {
+    pub fn init(deque_bump: u8, base_mint: &Pubkey, quote_mint: &Pubkey) -> Self {
         DequeHeader {
             discriminant: DEQUE_ACCOUNT_DISCRIMINANT,
             base_mint: *base_mint,
@@ -42,19 +45,19 @@ impl DequeHeader {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn verify_discriminant(&self) -> ProgramResult {
         if self.discriminant != DEQUE_ACCOUNT_DISCRIMINANT {
-            return Err(ProgramError::InvalidAccountData);
+            return Err(DequeError::InvalidDiscriminant.into());
         }
         Ok(())
     }
 }
 
-const_assert_eq!(size_of::<DequeHeader>(), HEADER_FIXED_SIZE);
+const_assert_eq!(size_of::<DequeHeader>(), DEQUE_HEADER_SIZE);
 // Ensure the fixed size is exactly what's expected.
 const_assert_eq!(
-    HEADER_FIXED_SIZE,
+    DEQUE_HEADER_SIZE,
     8 + // discriminant
     4 + // len
     4 + // free_head

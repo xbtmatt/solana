@@ -1,11 +1,11 @@
 use core::mem::MaybeUninit;
 
-use crate::pack::Discriminant;
+use crate::pack::Tagged;
 use solana_program::program_error::ProgramError;
 
 use crate::{
-    impl_discriminants,
-    pack::{Pack, PackWithDiscriminant, U16_BYTES},
+    impl_tags,
+    pack::{Pack, PackWithTag, U16_BYTES},
     require,
     shared::error::DequeError,
     utils::write_bytes,
@@ -43,7 +43,7 @@ pub enum InstructionTag {
     FlushEventLog,
 }
 
-impl_discriminants! {
+impl_tags! {
     InitializeInstructionData    => InstructionTag::Initialize,
     DepositInstructionData       => InstructionTag::Deposit,
     WithdrawInstructionData      => InstructionTag::Withdraw,

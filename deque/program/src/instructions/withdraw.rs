@@ -1,7 +1,4 @@
-use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, msg, program_error::ProgramError,
-    pubkey::Pubkey,
-};
+use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, msg, pubkey::Pubkey};
 
 use crate::{
     context::market_choice::MarketChoiceContext,
@@ -28,7 +25,7 @@ pub fn process(
 
     let mut data = deque_account.data.borrow_mut();
     // Deque discriminant is checked in `load`.
-    let deque = Deque::new_from_bytes_unchecked(&mut data)?;
+    let deque = Deque::from_bytes_unchecked(&mut data)?;
 
     // Try to find a node with the payer.
     let escrow_and_idx = deque
@@ -48,7 +45,7 @@ pub fn process(
             }
 
             let mut data = deque_account.data.borrow_mut();
-            let mut deque = Deque::new_from_bytes_unchecked(&mut data)?;
+            let mut deque = Deque::from_bytes_unchecked(&mut data)?;
 
             // Remove the node from the deque if the trader has no coins in either token.
             if escrow.amount_of_opposite_choice(&ctx.choice) == 0 {

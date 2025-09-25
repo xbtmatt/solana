@@ -1,5 +1,4 @@
 use solana_program::{
-    account_info::AccountInfo,
     entrypoint::ProgramResult,
     instruction::{AccountMeta, Instruction},
     program::invoke_signed,
@@ -13,22 +12,27 @@ use crate::{
     events::{EmittableEvent, HeaderEventData},
     instruction_enum::InstructionTag,
     seeds,
+    shared::error::DequeError,
+    state::EphemeralEventLog,
+    validation::{event_authority::EventAuthorityInfo, self_program::SelfProgramInfo},
 };
 
 const MAX_CPI_DATA_LEN: usize = MAX_CPI_INSTRUCTION_DATA_LEN as usize;
-const EVENT_HEADER_SIZE: usize = 76;
+/// The event header size with the instruction tag prepended.
+const FULL_HEADER_SIZE: usize = HeaderEventData::LEN + size_of::<InstructionTag>();
 
-pub struct EventEmitter<'a> {
+pub struct EventEmitter<'a, 'info> {
     pub emit_instruction: Instruction,
-    pub account_infos: [AccountInfo<'a>; 2],
+    pub self_program: SelfProgramInfo<'a, 'info>,
+    pub event_authority: EventAuthorityInfo<'a, 'info>,
 }
 
-impl<'info> EventEmitter<'info> {
-    pub(crate) fn new<'a>(
+impl<'a, 'info> EventEmitter<'a, 'info> {
+    pub(crate) fn new(
         ctx: EventEmitterContext<'a, 'info>,
         sender: &Pubkey,
         market: &Pubkey,
-        instruction_tag: InstructionTag,
+        triggering_instruction_tag: InstructionTag,
     ) -> Result<Self, ProgramError> {
         // TODO: benchmark the cost of allocating the full max CPI data length up front as opposed
         // to resizing infrequently
@@ -42,7 +46,22 @@ impl<'info> EventEmitter<'info> {
         }
 
         // TODO: Fill this with meaningful data.
-        HeaderEventData::new(instruction_tag, market, sender, 1, 10).write(&mut data)?;
+        HeaderEventData::new(triggering_instruction_tag, market, sender, 1, 10).write(&mut data)?;
+
+        // TODO: Tbh, this would be much simpler/more ergonomic if the lifetime of the
+        // ephemeral event log were tied to the EventAuthorityInfo struct.
+        // It'd be easy to call, would reduce boilerplate, and the lifetimes would automatically
+        // protect against double borrows (I believe).
+        // Cast the event authority's account data to a mutable ephemeral event log.
+        let mut event_authority_data = ctx
+            .event_authority
+            .info
+            .data
+            .try_borrow_mut()
+            .or(Err(DequeError::InvalidEventAuthorityBorrow))?;
+
+        // Initialize the ephemeral event log.
+        EphemeralEventLog::init(&mut event_authority_data)?;
 
         Ok(Self {
             emit_instruction: Instruction {
@@ -53,20 +72,44 @@ impl<'info> EventEmitter<'info> {
                 )],
                 data,
             },
-            account_infos: [
-                ctx.self_program.info.as_ref().clone(),
-                ctx.event_authority.info.as_ref().clone(),
-            ],
+            self_program: ctx.self_program.clone(),
+            event_authority: ctx.event_authority.clone(),
         })
     }
 
     pub fn flush(&mut self) -> ProgramResult {
+        // Cast the event authority's account data to a mutable ephemeral event log.
+        let mut event_authority_data = self
+            .event_authority
+            .info
+            .data
+            .try_borrow_mut()
+            .or(Err(DequeError::InvalidEventAuthorityBorrow))?;
+        let mut ephemeral_event_log =
+            EphemeralEventLog::from_bytes_unchecked(&mut event_authority_data)?;
+
+        // TODO: As it stands, the data in the header is *not* actually duplicated.
+        // This would have to be refactored to make sure that the CPI header data is always synced
+        // with the ephemeral event log header data.
+        // Write the event-specific data in the instruction buffer to the ephemeral event log.
+        unsafe {
+            ephemeral_event_log.append_event_data(
+                self.emit_instruction.data.as_ptr().add(FULL_HEADER_SIZE),
+                self.emit_instruction.data.len() - FULL_HEADER_SIZE,
+            )?;
+        }
+
+        // Invoke the cpi to emit instruction data events.
         invoke_signed(
             &self.emit_instruction,
-            &self.account_infos,
+            &[
+                self.self_program.info.clone(),
+                self.event_authority.info.clone(),
+            ],
             &[seeds::event_authority::SEEDS],
         )?;
-        self.emit_instruction.data.truncate(EVENT_HEADER_SIZE);
+
+        self.emit_instruction.data.truncate(FULL_HEADER_SIZE);
         Ok(())
     }
 

@@ -3,7 +3,7 @@ use solana_program::{account_info::AccountInfo, program_error::ProgramError};
 use crate::{require, seeds};
 
 #[derive(Clone)]
-pub(crate) struct EventAuthorityInfo<'a, 'info> {
+pub struct EventAuthorityInfo<'a, 'info> {
     pub info: &'a AccountInfo<'info>,
 }
 

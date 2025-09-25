@@ -37,11 +37,11 @@ pub trait Pack<const LEN: usize>: Sized {
     unsafe fn unpack_unchecked(instruction_data: &[u8]) -> Self;
 }
 
-pub trait Discriminant {
+pub trait Tagged {
     const TAG: u8;
 }
 
-pub trait PackWithDiscriminant<const LEN: usize>: Pack<LEN> + Discriminant {
+pub trait PackWithTag<const LEN: usize>: Pack<LEN> + Tagged {
     #[inline(always)]
     fn check_tag(data: &[u8]) -> ProgramResult {
         // Safety: Length should be verified before calling this function, usually with `check_len`.
@@ -61,7 +61,7 @@ pub trait PackWithDiscriminant<const LEN: usize>: Pack<LEN> + Discriminant {
 }
 
 // Blanket impl for Pack-able + Discriminant.
-impl<T, const N: usize> PackWithDiscriminant<N> for T where T: Pack<N> + Discriminant {}
+impl<T, const N: usize> PackWithTag<N> for T where T: Pack<N> + Tagged {}
 
 pub const U16_BYTES: usize = core::mem::size_of::<u16>();
 pub const U64_BYTES: usize = core::mem::size_of::<u64>();

@@ -37,7 +37,7 @@ impl<'a, 'info> MarketChoiceContext<'a, 'info> {
         let system_program = next_account_info(accounts_iter)?;
 
         let mut data = deque_account.data.borrow_mut();
-        let deque = Deque::new_from_bytes(&mut data)?;
+        let deque = Deque::from_bytes(&mut data)?;
         check_owned_and_writable(deque_account)?;
 
         let mint = match choice {

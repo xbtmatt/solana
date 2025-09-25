@@ -34,7 +34,7 @@ pub fn process(
     // Try to find the trader in existing nodes.
     let mut data = deque_account.data.borrow_mut();
     // The deque's account discriminant is checked in `load`.
-    let deque = Deque::new_from_bytes_unchecked(&mut data)?;
+    let deque = Deque::from_bytes_unchecked(&mut data)?;
     let maybe_idx = deque
         .iter_nodes::<MarketEscrow>()
         .find(|(node, _)| node.trader.as_ref() == payer.key.as_ref())
@@ -75,7 +75,7 @@ pub fn process(
             }
 
             let mut data = deque_account.data.borrow_mut();
-            let mut deque = Deque::new_from_bytes_unchecked(&mut data)?;
+            let mut deque = Deque::from_bytes_unchecked(&mut data)?;
 
             let escrow = match choice {
                 MarketChoice::Base => MarketEscrow::new(*payer.key, amount, 0),

@@ -4,7 +4,7 @@ use static_assertions::const_assert_eq;
 
 use crate::{
     shared::error::DequeError,
-    state::{DequeHeader, MarketEscrow, Stack, StackNode, HEADER_FIXED_SIZE},
+    state::{DequeHeader, MarketEscrow, Stack, StackNode, DEQUE_HEADER_SIZE},
     utils::{
         from_sector_idx, from_sector_idx_mut, from_slab_bytes_mut, SectorIndex, Slab, NIL,
         SECTOR_SIZE,
@@ -22,8 +22,8 @@ pub struct DequeNode<T> {
 
 // Ensure that deque and stack nodes are the same size, regardless of type.
 const_assert_eq!(
-    size_of::<DequeNode<MarketEscrow>>(),
-    size_of::<StackNode<MarketEscrow>>()
+    core::mem::size_of::<DequeNode<MarketEscrow>>(),
+    core::mem::size_of::<StackNode<MarketEscrow>>()
 );
 
 unsafe impl<T: Pod> Pod for DequeNode<T> {}
@@ -37,23 +37,22 @@ pub struct Deque<'a> {
 }
 
 impl<'a> Deque<'a> {
-    /// Construct a new, empty Deque, given an existing header and the deque type input.
-    /// It's assumed that the data has already been allocated and aligned properly to the number
-    /// of sectors.
-    pub fn init_deque_account(
-        data: &mut [u8],
+    /// Construct a new, empty Deque with allocated but uninitialized (zerod out) account data.
+    /// The account data passed in must already be aligned with the number of sectors.
+    pub fn init(
+        zerod_account_data: &'a mut [u8],
         num_sectors: u16,
         deque_bump: u8,
         base_mint: &Pubkey,
         quote_mint: &Pubkey,
     ) -> ProgramResult {
-        if data.len() < HEADER_FIXED_SIZE {
-            return Err(ProgramError::InvalidAccountData);
+        if zerod_account_data.len() < DEQUE_HEADER_SIZE {
+            return Err(DequeError::AccountUnallocated.into());
         }
 
-        let mut deque = Deque::new_from_bytes_unchecked(data)?;
+        let mut deque = Deque::from_bytes_unchecked(zerod_account_data)?;
         // Write a new empty header to the `deque.header`
-        *deque.header = DequeHeader::new_empty(deque_bump, base_mint, quote_mint);
+        *deque.header = DequeHeader::init(deque_bump, base_mint, quote_mint);
 
         debug_assert_eq!(deque.sectors.len() % SECTOR_SIZE, 0);
         debug_assert_eq!(deque.sectors.len(), (num_sectors as usize) * SECTOR_SIZE);
@@ -76,18 +75,18 @@ impl<'a> Deque<'a> {
         (self.sectors.len() / SECTOR_SIZE) as u32
     }
 
-    /// Construct a Deque from an existing byte vector without checking the header's discriminant.
-    pub fn new_from_bytes_unchecked(data: &'a mut [u8]) -> Result<Self, ProgramError> {
-        let (header_slab, sectors) = data.split_at_mut(HEADER_FIXED_SIZE);
+    /// Cast a byte vector to a Deque and check the header's discriminant.
+    pub fn from_bytes(data: &'a mut [u8]) -> Result<Self, ProgramError> {
+        let (header_slab, sectors) = data.split_at_mut(DEQUE_HEADER_SIZE);
         let header = from_slab_bytes_mut::<DequeHeader>(header_slab, 0_usize)?;
+        header.verify_discriminant()?;
         Ok(Self { header, sectors })
     }
 
-    /// Construct a Deque from an existing byte vector and check the header's discriminant.
-    pub fn new_from_bytes(data: &'a mut [u8]) -> Result<Self, ProgramError> {
-        let (header_slab, sectors) = data.split_at_mut(HEADER_FIXED_SIZE);
+    /// Cast a byte vector to a Deque without checking the header's discriminant.
+    pub fn from_bytes_unchecked(data: &'a mut [u8]) -> Result<Self, ProgramError> {
+        let (header_slab, sectors) = data.split_at_mut(DEQUE_HEADER_SIZE);
         let header = from_slab_bytes_mut::<DequeHeader>(header_slab, 0_usize)?;
-        header.verify_discriminant()?;
         Ok(Self { header, sectors })
     }
 

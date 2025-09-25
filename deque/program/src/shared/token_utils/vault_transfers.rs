@@ -71,7 +71,7 @@ pub fn withdraw_from_vault<'a, 'info>(
     amount: u64,
 ) -> ProgramResult {
     let mut data = ctx.deque_account.data.borrow_mut();
-    let deque = Deque::new_from_bytes_unchecked(&mut data)?;
+    let deque = Deque::from_bytes_unchecked(&mut data)?;
     let (base_mint, quote_mint, deque_bump) = (
         deque.header.base_mint,
         deque.header.quote_mint,

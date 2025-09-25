@@ -35,7 +35,7 @@ pub async fn subscribe_program_and_send() -> Result<()> {
                 Some(RpcProgramAccountsConfig {
                     filters: Some(vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
                         0,
-                        DEQUE_ACCOUNT_DISCRIMINANT.to_le_bytes().to_vec(),
+                        DEQUE_ACCOUNT_DISCRIMINANT.to_vec(),
                     ))]),
                     account_config: RpcAccountInfoConfig {
                         commitment: Some(CommitmentConfig::confirmed()),
@@ -54,7 +54,7 @@ pub async fn subscribe_program_and_send() -> Result<()> {
             // Technically this could be the `_unchecked` version of this call since we filtered by
             // the discriminant already, but it's a simple extra check.
             account.value.account.data.decode().inspect(|bytes| {
-                if let Ok(deque) = Deque::new_from_bytes(&mut bytes.to_owned()) {
+                if let Ok(deque) = Deque::from_bytes(&mut bytes.to_owned()) {
                     println!("{deque:#?}");
                 } else {
                     println!("Failed to unpack deque account.");

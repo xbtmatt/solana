@@ -37,7 +37,7 @@ pub enum DequeError {
     InvalidMarketChoice,
     InvalidNumberOfAccounts,
     InsufficientVecCapacity,
-    MalformedDeque,
+    MalformedSlab,
     InvalidSectorIndex,
     ArithmetricError,
     AccountNotOwnedByProgram,
@@ -46,6 +46,9 @@ pub enum DequeError {
     MustBeGreaterThanOne,
     NoActiveEscrow,
     OutOfBounds,
+    AccountUnallocated,
+    InvalidEventAuthorityBorrow,
+    InsufficientAccountSpace,
 }
 
 impl From<DequeError> for ProgramError {
@@ -63,7 +66,7 @@ impl From<DequeError> for &'static str {
             DequeError::InvalidMarketChoice => "Invalid market choice",
             DequeError::InvalidNumberOfAccounts => "Invalid number of accounts passed",
             DequeError::InsufficientVecCapacity => "Insufficient vec.capacity()",
-            DequeError::MalformedDeque => "Malformed deque data",
+            DequeError::MalformedSlab => "Malformed slab data",
             DequeError::InvalidSectorIndex => "Invalid sector index",
             DequeError::ArithmetricError => "Checked arithmetic failed",
             DequeError::AccountIsNotWritable => "Account is not writable",
@@ -72,6 +75,11 @@ impl From<DequeError> for &'static str {
             DequeError::MustBeGreaterThanOne => "Argument is not >= 1",
             DequeError::NoActiveEscrow => "Trader has no active escrow",
             DequeError::OutOfBounds => "Index is out of bounds",
+            DequeError::AccountUnallocated => "Account hasn't been allocated enough data",
+            DequeError::InvalidEventAuthorityBorrow => {
+                "Couldn't borrow event authority account data"
+            }
+            DequeError::InsufficientAccountSpace => "Account doesn't have enough space",
         }
     }
 }

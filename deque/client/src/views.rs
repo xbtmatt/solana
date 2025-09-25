@@ -27,8 +27,7 @@ pub fn inspect_account(client: &RpcClient, account_pubkey: &Pubkey, verbose: boo
             }
 
             let cloned_data = &mut account.data.clone();
-            let deque =
-                Deque::new_from_bytes(cloned_data).expect("Should be able to cast directly.");
+            let deque = Deque::from_bytes(cloned_data).expect("Should be able to cast directly.");
             if verbose {
                 println!(
                     "len: {}, deque_head: {:#?}, deque_tail: {:#?}, free_head: {:#?}",

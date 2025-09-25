@@ -4,21 +4,21 @@
 #[cfg(all(target_os = "solana", not(target_feature = "static-syscalls")))]
 // Syscalls provided by the SVM runtime (SBPFv0, SBPFv1 and SBPFv2).
 extern "C" {
-    pub fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64);
+    pub fn sol_memcpy_(dst: *mut u8, src: *const u8, num_bytes: u64);
 }
 
 #[cfg(all(target_os = "solana", target_feature = "static-syscalls"))]
 // Syscalls provided by the SVM runtime (SBPFv3 and newer).
-pub(crate) fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64) {
+pub(crate) fn sol_memcpy_(dst: *mut u8, src: *const u8, num_bytes: u64) {
     let syscall: extern "C" fn(*mut u8, *const u8, u64) =
         unsafe { core::mem::transmute(1904002211u64) }; // murmur32 hash of "sol_memcpy_"
-    syscall(dst, src, n)
+    syscall(dst, src, num_bytes)
 }
 
 #[cfg(not(target_os = "solana"))]
 #[allow(dead_code)]
-pub(crate) fn sol_memcpy_(dst: *mut u8, src: *const u8, n: u64) {
+pub(crate) fn sol_memcpy_(dst: *mut u8, src: *const u8, num_bytes: u64) {
     unsafe {
-        core::ptr::copy_nonoverlapping(src, dst, n as usize);
+        core::ptr::copy_nonoverlapping(src, dst, num_bytes as usize);
     }
 }

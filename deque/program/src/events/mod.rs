@@ -2,9 +2,9 @@ use solana_program::program_error::ProgramError;
 use solana_program::{entrypoint::ProgramResult, pubkey::Pubkey};
 
 use crate::instruction_enum::{InstructionTag, MarketChoice};
-use crate::pack::{vec_append_bytes, Discriminant};
+use crate::pack::{vec_append_bytes, Tagged};
 use crate::shared::error::DequeError;
-use crate::{impl_discriminants, require};
+use crate::{impl_tags, require};
 
 pub(crate) mod event_emitter;
 
@@ -55,7 +55,7 @@ impl<'p> DequeEvent<'p> {
     }
 }
 
-impl_discriminants!(
+impl_tags!(
     HeaderEventData<'_>       => EventTag::Header,
     // InitializeEventData    => EventTag::Initialize,
     DepositEventData<'_>      => EventTag::Deposit,

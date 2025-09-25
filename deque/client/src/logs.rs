@@ -1,4 +1,4 @@
-use deque::{state::HEADER_FIXED_SIZE, utils::SECTOR_SIZE};
+use deque::{state::DEQUE_HEADER_SIZE, utils::SECTOR_SIZE};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 
@@ -8,7 +8,7 @@ pub fn print_size_and_sectors(client: &RpcClient, account_pubkey: &Pubkey) {
         println!(
             "\nAccount size: {} bytes, {} sectors\n",
             len,
-            (len - HEADER_FIXED_SIZE) / SECTOR_SIZE
+            (len - DEQUE_HEADER_SIZE) / SECTOR_SIZE
         );
     }
 }
