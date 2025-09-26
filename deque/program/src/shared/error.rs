@@ -46,7 +46,8 @@ pub enum DequeError {
     MustBeGreaterThanOne,
     NoActiveEscrow,
     OutOfBounds,
-    AccountUnallocated,
+    DequeAccountUnallocated,
+    EventAuthorityUnallocated,
     InvalidEventAuthorityBorrow,
     InsufficientAccountSpace,
 }
@@ -75,7 +76,12 @@ impl From<DequeError> for &'static str {
             DequeError::MustBeGreaterThanOne => "Argument is not >= 1",
             DequeError::NoActiveEscrow => "Trader has no active escrow",
             DequeError::OutOfBounds => "Index is out of bounds",
-            DequeError::AccountUnallocated => "Account hasn't been allocated enough data",
+            DequeError::DequeAccountUnallocated => {
+                "Deque account hasn't been allocated enough data"
+            }
+            DequeError::EventAuthorityUnallocated => {
+                "Event authority hasn't been allocated enough data"
+            }
             DequeError::InvalidEventAuthorityBorrow => {
                 "Couldn't borrow event authority account data"
             }

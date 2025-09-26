@@ -81,7 +81,7 @@ impl<'a> EphemeralEventLog<'a> {
     /// Construct a new, empty EventData with allocated but uninitialized (zerod out) account data.
     pub fn init(zerod_account_data: &'a mut [u8]) -> ProgramResult {
         if zerod_account_data.len() != EVENT_DATA_ACCOUNT_SIZE_INVARIANT {
-            return Err(DequeError::AccountUnallocated.into());
+            return Err(DequeError::EventAuthorityUnallocated.into());
         }
 
         let event_log = EphemeralEventLog::from_bytes_unchecked(zerod_account_data)?;

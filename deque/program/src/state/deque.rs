@@ -47,7 +47,7 @@ impl<'a> Deque<'a> {
         quote_mint: &Pubkey,
     ) -> ProgramResult {
         if zerod_account_data.len() < DEQUE_HEADER_SIZE {
-            return Err(DequeError::AccountUnallocated.into());
+            return Err(DequeError::DequeAccountUnallocated.into());
         }
 
         let mut deque = Deque::from_bytes_unchecked(zerod_account_data)?;

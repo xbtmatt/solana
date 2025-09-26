@@ -20,23 +20,39 @@ pub fn process_instruction(
 ) -> ProgramResult {
     let instruction_tag: InstructionTag = instruction_data[0].try_into()?;
 
-    // If the instruction is for an event log flush, flush and return early, as the number of
-    // account checks are only valid for non-flush instructions.
-    if let InstructionTag::FlushEventLog = instruction_tag {
-        let authority = next_account_info(&mut accounts.iter())?;
-        require!(
-            authority.is_signer,
-            ProgramError::MissingRequiredSignature,
-            "Event authority must be a signer"
-        )?;
-        require!(
-            authority.key.as_ref() == seeds::event_authority::ID.as_ref(),
-            ProgramError::IncorrectAuthority,
-            "Invalid event authority"
-        )?;
-        msg!("Flushing! 🚽");
-        return Ok(());
+    match instruction_tag {
+        InstructionTag::FlushEventLog => handle_flush(accounts)?,
+        _ => handle_non_flush(program_id, accounts, instruction_data, instruction_tag)?,
     }
+
+    Ok(())
+}
+
+/// This doesn't actually need to do anything- it merely flushes the passed instruction data.
+fn handle_flush(accounts: &[AccountInfo]) -> ProgramResult {
+    let authority = next_account_info(&mut accounts.iter())?;
+    require!(
+        authority.is_signer,
+        ProgramError::MissingRequiredSignature,
+        "Event authority must be a signer"
+    )?;
+    require!(
+        authority.key.as_ref() == seeds::event_authority::ID.as_ref(),
+        ProgramError::IncorrectAuthority,
+        "Invalid event authority"
+    )?;
+    msg!("Flushing! 🚽");
+
+    Ok(())
+}
+
+fn handle_non_flush(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: &[u8],
+    instruction_tag: InstructionTag,
+) -> ProgramResult {
+    debug_assert!(instruction_tag != InstructionTag::FlushEventLog);
 
     // Split [self program, event authority] from the rest of the accounts.
     require!(
@@ -46,6 +62,7 @@ pub fn process_instruction(
         2,
         accounts.len()
     )?;
+
     let (event_emitter_accounts, accounts) = accounts.split_at(2);
     let event_ctx = EventEmitterContext::load(event_emitter_accounts)?;
 

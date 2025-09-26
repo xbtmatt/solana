@@ -7,15 +7,15 @@ use solana_sdk::{
 };
 
 use crate::{
-    tokens::{DequeContext, INITIAL_MINT_AMOUNT},
+    tokens::{MarketContext, INITIAL_MINT_AMOUNT},
     transactions::send_txn,
 };
 
 /// Create both payer ATAs and initialize the deque.
-pub fn initialize_deque_with_ctx(
+pub fn initialize_market_and_event_authority(
     rpc: &RpcClient,
     payer: &Keypair,
-    ctx: &DequeContext,
+    ctx: &MarketContext,
 ) -> anyhow::Result<Signature> {
     let init_num_sectors = 0;
 
@@ -23,7 +23,7 @@ pub fn initialize_deque_with_ctx(
         rpc,
         payer,
         &[payer],
-        vec![ctx.initialize_deque_ixn(payer, init_num_sectors)],
+        vec![ctx.initialize_deque_market_ixn(payer, init_num_sectors)],
         "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
     )
     .context("Should initialize")
@@ -33,7 +33,7 @@ pub fn init_atas_and_send_tokens_to_acc(
     funder: &Keypair,
     rpc: &RpcClient,
     receiver: &Keypair,
-    ctx: &DequeContext,
+    ctx: &MarketContext,
     num_payers: u64,
 ) -> anyhow::Result<Signature> {
     let (funder_base_ata, funder_quote_ata) = ctx.get_atas(&funder.pubkey());

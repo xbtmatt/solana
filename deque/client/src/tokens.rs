@@ -5,7 +5,7 @@ use deque::{
         WithdrawInstructionData,
     },
     pack::Pack,
-    seeds,
+    seeds::{self, event_authority},
 };
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
@@ -99,7 +99,7 @@ pub fn get_token_balance(rpc: &RpcClient, owner: &Pubkey, mint: &Pubkey) -> u64 
 }
 
 #[derive(Clone)]
-pub struct DequeContext {
+pub struct MarketContext {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
     pub deque_pubkey: Pubkey,
@@ -108,6 +108,7 @@ pub struct DequeContext {
     pub base_token_program: Pubkey,
     pub quote_token_program: Pubkey,
     pub ata_program: Pubkey,
+    pub event_authority: Pubkey,
 }
 
 pub enum DepositOrWithdraw {
@@ -127,7 +128,7 @@ impl From<WithdrawInstructionData> for DepositOrWithdraw {
     }
 }
 
-impl DequeContext {
+impl MarketContext {
     pub fn get_atas(&self, owner: &Pubkey) -> (Pubkey, Pubkey) {
         (
             get_associated_token_address(owner, &self.base_mint),
@@ -148,7 +149,7 @@ impl DequeContext {
         )
     }
 
-    pub fn initialize_deque_ixn(&self, payer: &Keypair, num_sectors: u16) -> Instruction {
+    pub fn initialize_deque_market_ixn(&self, payer: &Keypair, num_sectors: u16) -> Instruction {
         Instruction {
             program_id: deque::ID,
             data: DequeInstruction::Initialize(InitializeInstructionData { num_sectors }).pack(),
@@ -206,7 +207,7 @@ impl DequeContext {
 
 pub const INITIAL_MINT_AMOUNT: u64 = 100000;
 
-pub fn generate_market(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<DequeContext> {
+pub fn generate_market(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<MarketContext> {
     let (base_mint, _) =
         create_token(rpc, payer, 10, INITIAL_MINT_AMOUNT).context("failed to mint base")?;
     let (quote_mint, _) =
@@ -222,7 +223,7 @@ pub fn generate_market(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<Deque
     println!("vault_base_ata: {}", vault_base_ata);
     println!("vault_quote_ata: {}", vault_quote_ata);
 
-    Ok(DequeContext {
+    Ok(MarketContext {
         base_mint,
         quote_mint,
         deque_pubkey,
@@ -231,5 +232,6 @@ pub fn generate_market(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<Deque
         base_token_program: spl_token::id(),
         quote_token_program: spl_token::id(),
         ata_program: spl_associated_token_account::id(),
+        event_authority: event_authority::ID,
     })
 }

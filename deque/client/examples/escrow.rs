@@ -5,7 +5,7 @@ use deque::instruction_enum::{
 use deque_client::{
     events::fetch_parsed_txn,
     fuzz::fuzz,
-    initialize::initialize_deque_with_ctx,
+    initialize::initialize_market_and_event_authority,
     tokens::generate_market,
     transactions::{fund_account, send_deposit_or_withdraw, send_txn},
 };
@@ -39,7 +39,7 @@ fn test_market_escrow(rpc: &RpcClient, payer: &Keypair) -> anyhow::Result<()> {
     println!("payer_base_ata {:#?}", payer_base_ata.to_string());
 
     // ------------------------------------- Initialization ----------------------------------------
-    initialize_deque_with_ctx(rpc, payer, &ctx)?;
+    initialize_market_and_event_authority(rpc, payer, &ctx)?;
 
     // ------------------------------ Deposit base, base, quote --------------------------------
 

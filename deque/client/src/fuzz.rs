@@ -7,7 +7,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::{signature::Keypair, signer::Signer};
 
 use crate::{
-    tokens::{DequeContext, INITIAL_MINT_AMOUNT},
+    tokens::{MarketContext, INITIAL_MINT_AMOUNT},
     transactions::send_deposit_or_withdraw,
 };
 
@@ -46,7 +46,7 @@ use crate::{
 pub fn fuzz(
     rpc: &RpcClient,
     payer: &Keypair,
-    ctx: &DequeContext,
+    ctx: &MarketContext,
     rounds: u64,
     num_payers: Option<usize>,
 ) -> anyhow::Result<()> {

@@ -16,8 +16,8 @@ use tokio_stream::StreamExt;
 
 use crate::{
     fuzz::fuzz,
-    initialize::{init_atas_and_send_tokens_to_acc, initialize_deque_with_ctx},
-    tokens::{generate_market, DequeContext},
+    initialize::{init_atas_and_send_tokens_to_acc, initialize_market_and_event_authority},
+    tokens::{generate_market, MarketContext},
     transactions::fund_account,
 };
 
@@ -66,7 +66,8 @@ pub async fn subscribe_program_and_send() -> Result<()> {
     let rpc = create_client();
     let primary_payer = fund_account(&rpc, None).await.expect("Should fund account");
     let ctx = generate_market(&rpc, &primary_payer).expect("Should be able to generate deque");
-    initialize_deque_with_ctx(&rpc, &primary_payer, &ctx).expect("Should initialize the deque");
+    initialize_market_and_event_authority(&rpc, &primary_payer, &ctx)
+        .expect("Should initialize the deque");
 
     // Fund all payers.
     let num_payers = 10;
@@ -100,7 +101,7 @@ pub async fn subscribe_program_and_send() -> Result<()> {
 
 async fn create_and_fund_payers(
     funder_kp_str: &str,
-    ctx: &DequeContext,
+    ctx: &MarketContext,
     num_payers: usize,
 ) -> Vec<Keypair> {
     let rpc = Arc::new(create_client());
