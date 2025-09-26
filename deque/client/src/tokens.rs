@@ -1,7 +1,8 @@
 use anyhow::Context;
 use deque::{
     instruction_enum::{
-        DepositInstructionData, DequeInstruction, InitializeInstructionData, MarketChoice,
+        DepositInstructionData, InitializeDequeInstructionData,
+        InitializeEventAuthorityInstructionData, MarketChoice, ResizeEventAuthorityInstructionData,
         WithdrawInstructionData,
     },
     pack::Pack,
@@ -152,7 +153,9 @@ impl MarketContext {
     pub fn initialize_deque_market_ixn(&self, payer: &Keypair, num_sectors: u16) -> Instruction {
         Instruction {
             program_id: deque::ID,
-            data: DequeInstruction::Initialize(InitializeInstructionData { num_sectors }).pack(),
+            data: InitializeDequeInstructionData { num_sectors }
+                .pack()
+                .to_vec(),
             accounts: vec![
                 AccountMeta::new_readonly(deque::ID, false),
                 AccountMeta::new_readonly(seeds::event_authority::ID, false),
@@ -165,6 +168,30 @@ impl MarketContext {
                 AccountMeta::new_readonly(self.base_token_program, false),
                 AccountMeta::new_readonly(self.quote_token_program, false),
                 AccountMeta::new_readonly(self.ata_program, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        }
+    }
+
+    pub fn initialize_event_authority_ixn(&self, payer: &Keypair) -> Instruction {
+        Instruction {
+            program_id: deque::ID,
+            data: InitializeEventAuthorityInstructionData {}.pack().to_vec(),
+            accounts: vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(seeds::event_authority::ID, false),
+                AccountMeta::new_readonly(system_program::id(), false),
+            ],
+        }
+    }
+
+    pub fn resize_event_authority_ixn(&self, payer: &Keypair) -> Instruction {
+        Instruction {
+            program_id: deque::ID,
+            data: ResizeEventAuthorityInstructionData {}.pack().to_vec(),
+            accounts: vec![
+                AccountMeta::new(payer.pubkey(), true),
+                AccountMeta::new(seeds::event_authority::ID, false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
         }
@@ -192,7 +219,7 @@ impl MarketContext {
             data,
             accounts: vec![
                 AccountMeta::new_readonly(deque::ID, false),
-                AccountMeta::new_readonly(seeds::event_authority::ID, false),
+                AccountMeta::new(seeds::event_authority::ID, false),
                 AccountMeta::new(self.deque_pubkey, false),
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(payer_ata, false),

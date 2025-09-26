@@ -33,6 +33,7 @@ macro_rules! require {
 #[repr(u8)]
 pub enum DequeError {
     InvalidDiscriminant,
+    InvalidInstructionTag,
     InvalidPackedData,
     InvalidMarketChoice,
     InvalidNumberOfAccounts,
@@ -47,9 +48,13 @@ pub enum DequeError {
     NoActiveEscrow,
     OutOfBounds,
     DequeAccountUnallocated,
-    EventAuthorityUnallocated,
+    EventAuthorityNotAllocated,
+    EventAuthorityNotFullyAllocated,
     InvalidEventAuthorityBorrow,
     InsufficientAccountSpace,
+    TransferError,
+    RentGetError,
+    ReallocError,
 }
 
 impl From<DequeError> for ProgramError {
@@ -63,6 +68,7 @@ impl From<DequeError> for &'static str {
     fn from(value: DequeError) -> Self {
         match value {
             DequeError::InvalidDiscriminant => "Invalid discriminant",
+            DequeError::InvalidInstructionTag => "Invalid instruction tag",
             DequeError::InvalidPackedData => "Invalid packed data",
             DequeError::InvalidMarketChoice => "Invalid market choice",
             DequeError::InvalidNumberOfAccounts => "Invalid number of accounts passed",
@@ -79,13 +85,19 @@ impl From<DequeError> for &'static str {
             DequeError::DequeAccountUnallocated => {
                 "Deque account hasn't been allocated enough data"
             }
-            DequeError::EventAuthorityUnallocated => {
+            DequeError::EventAuthorityNotAllocated => {
+                "Event authority hasn't been allocated any data"
+            }
+            DequeError::EventAuthorityNotFullyAllocated => {
                 "Event authority hasn't been allocated enough data"
             }
             DequeError::InvalidEventAuthorityBorrow => {
                 "Couldn't borrow event authority account data"
             }
             DequeError::InsufficientAccountSpace => "Account doesn't have enough space",
+            DequeError::TransferError => "Couldn't invoke system transfer",
+            DequeError::RentGetError => "Failed to get rent",
+            DequeError::ReallocError => "Failed to realloc",
         }
     }
 }
@@ -99,3 +111,5 @@ impl core::fmt::Display for DequeError {
 
 #[cfg(not(target_os = "solana"))]
 impl std::error::Error for DequeError {}
+
+pub type DequeProgramResult = Result<(), DequeError>;

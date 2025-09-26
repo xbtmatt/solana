@@ -11,12 +11,32 @@ use crate::{
     transactions::send_txn,
 };
 
-/// Create both payer ATAs and initialize the deque.
+/// Initialize the event authority account and the deque/market.
 pub fn initialize_market_and_event_authority(
     rpc: &RpcClient,
     payer: &Keypair,
     ctx: &MarketContext,
 ) -> anyhow::Result<Signature> {
+    // Initialize the event authority account.
+    send_txn(
+        rpc,
+        payer,
+        &[payer],
+        vec![ctx.initialize_event_authority_ixn(payer)],
+        "initialize the event authority account".to_string(),
+    )
+    .context("Should initialize the event authority")?;
+
+    for _i in 1..10 {
+        send_txn(
+            rpc,
+            payer,
+            &[payer],
+            vec![ctx.resize_event_authority_ixn(payer)],
+            "add size to event authority account".to_string(),
+        )?;
+    }
+
     let init_num_sectors = 0;
 
     send_txn(
@@ -26,7 +46,7 @@ pub fn initialize_market_and_event_authority(
         vec![ctx.initialize_deque_market_ixn(payer, init_num_sectors)],
         "create base and quote mint ATAs for `payer`, then initialize the deque".to_string(),
     )
-    .context("Should initialize")
+    .context("Should initialize the deque")
 }
 
 pub fn init_atas_and_send_tokens_to_acc(

@@ -107,27 +107,18 @@ pub fn send_deposit_or_withdraw(
     vault_ata: Pubkey,
     deque_instruction: &DequeInstruction,
 ) -> anyhow::Result<Signature> {
-    let (label, amount, side) = match deque_instruction {
-        DequeInstruction::Deposit(dep) => ("deposit", Some(dep.amount as i64), dep.choice),
-        DequeInstruction::Withdraw(wd) => ("withdraw", None, wd.choice),
+    let label = match deque_instruction {
+        DequeInstruction::Deposit(_) => "deposit",
+        DequeInstruction::Withdraw(_) => "withdraw",
         _ => panic!("Instruction must be deposit or withdraw."),
     };
-
-    println!(
-        "BEFORE {}: payer, vault: ({}, {}), amount, side: ({}, {:?})",
-        label,
-        get_token_balance(rpc, &payer.pubkey(), &mint),
-        get_token_balance(rpc, &deque_pubkey, &mint),
-        amount.unwrap_or(-1),
-        side,
-    );
 
     let ixn = Instruction {
         program_id: deque::ID,
         data: deque_instruction.pack(),
         accounts: vec![
             AccountMeta::new_readonly(deque::ID, false),
-            AccountMeta::new_readonly(seeds::event_authority::ID, false),
+            AccountMeta::new(seeds::event_authority::ID, false),
             AccountMeta::new(deque_pubkey, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new(payer_ata, false),
@@ -139,14 +130,6 @@ pub fn send_deposit_or_withdraw(
     };
 
     let sig = send_txn(rpc, payer, &[payer], vec![ixn], label.to_string())?;
-
-    println!(
-        "AFTER:  payer, vault: ({}, {})",
-        get_token_balance(rpc, &payer.pubkey(), &mint),
-        get_token_balance(rpc, &deque_pubkey, &mint)
-    );
-
-    inspect_account(rpc, &deque_pubkey, false);
 
     Ok(sig)
 }

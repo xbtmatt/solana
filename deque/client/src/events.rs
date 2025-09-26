@@ -56,14 +56,14 @@ pub fn maybe_unpack_events(inner_ixn: &ParsedInnerInstruction) -> Option<Vec<Deq
     let instruction_tag = InstructionTag::try_from(*tag).ok()?;
 
     matches!(instruction_tag, InstructionTag::FlushEventLog)
-        .then(|| ixn_bytes_to_events(data).ok())
+        .then(|| unpack_event_bytes(data).ok())
         .flatten()
 }
 
 /// Unpacks a slab of bytes into deque events.
-/// Note that the data here is expected to start at the *first* byte after the ixn tag discriminant.
-/// That is, `all_data` should start  the *event* tag/discriminant.
-pub fn ixn_bytes_to_events(all_data: &[u8]) -> anyhow::Result<Vec<DequeEvent<'_>>> {
+/// Note that the data here is expected to start at the *first* byte of the event data.
+/// That is, `all_data` should start *at* the event tag/discriminant.
+pub fn unpack_event_bytes(all_data: &[u8]) -> anyhow::Result<Vec<DequeEvent<'_>>> {
     let mut i = 0;
     let mut res = vec![];
     loop {
@@ -141,7 +141,7 @@ fn test_multiple_events_in_slab() {
         };
     }
 
-    let parsed_events = ixn_bytes_to_events(&buf[..]).expect("Should parse all");
+    let parsed_events = unpack_event_bytes(&buf[..]).expect("Should parse all");
     assert_eq!(parsed_events.len(), events.len());
 
     events

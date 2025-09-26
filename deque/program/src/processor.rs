@@ -1,17 +1,17 @@
-use solana_program::account_info::next_account_info;
-use solana_program::msg;
-use solana_program::program_error::ProgramError;
 use solana_program::{account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey};
 
-use crate::context::event_emitter::EventEmitterContext;
-use crate::events::event_emitter::EventEmitter;
-use crate::instruction_enum::{
-    DepositInstructionData, InitializeInstructionData, InstructionTag, ResizeInstructionData,
-    WithdrawInstructionData,
+use crate::{
+    context::event_emitter::EventEmitterContext,
+    events::event_emitter::EventEmitter,
+    instruction_enum::{
+        DepositInstructionData, InitializeDequeInstructionData, InstructionTag,
+        ResizeInstructionData, WithdrawInstructionData,
+    },
+    instructions,
+    pack::Pack,
+    require,
+    shared::error::DequeError,
 };
-use crate::pack::Pack;
-use crate::shared::error::DequeError;
-use crate::{instructions, require, seeds};
 
 pub fn process_instruction(
     program_id: &Pubkey,
@@ -21,38 +21,31 @@ pub fn process_instruction(
     let instruction_tag: InstructionTag = instruction_data[0].try_into()?;
 
     match instruction_tag {
-        InstructionTag::FlushEventLog => handle_flush(accounts)?,
-        _ => handle_non_flush(program_id, accounts, instruction_data, instruction_tag)?,
+        InstructionTag::FlushEventLog => instructions::flush::process(accounts)?,
+        InstructionTag::InitializeEventAuthority => {
+            instructions::initialize_event_authority::process(program_id, accounts)?
+        }
+        InstructionTag::ResizeEventAuthority => {
+            instructions::resize_event_authority::process(program_id, accounts)?
+        }
+        _ => handle_instructions_with_events(
+            program_id,
+            accounts,
+            instruction_data,
+            instruction_tag,
+        )?,
     }
 
     Ok(())
 }
 
-/// This doesn't actually need to do anything- it merely flushes the passed instruction data.
-fn handle_flush(accounts: &[AccountInfo]) -> ProgramResult {
-    let authority = next_account_info(&mut accounts.iter())?;
-    require!(
-        authority.is_signer,
-        ProgramError::MissingRequiredSignature,
-        "Event authority must be a signer"
-    )?;
-    require!(
-        authority.key.as_ref() == seeds::event_authority::ID.as_ref(),
-        ProgramError::IncorrectAuthority,
-        "Invalid event authority"
-    )?;
-    msg!("Flushing! 🚽");
-
-    Ok(())
-}
-
-fn handle_non_flush(
+fn handle_instructions_with_events(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
     instruction_tag: InstructionTag,
 ) -> ProgramResult {
-    debug_assert!(instruction_tag != InstructionTag::FlushEventLog);
+    debug_assert!(instruction_tag as u8 != InstructionTag::FlushEventLog as u8);
 
     // Split [self program, event authority] from the rest of the accounts.
     require!(
@@ -75,9 +68,9 @@ fn handle_non_flush(
     )?;
 
     match instruction_tag {
-        InstructionTag::Initialize => {
-            let num_sectors = InitializeInstructionData::unpack(instruction_data)?.num_sectors;
-            instructions::initialize::process(program_id, accounts, num_sectors)?;
+        InstructionTag::InitializeDeque => {
+            let num_sectors = InitializeDequeInstructionData::unpack(instruction_data)?.num_sectors;
+            instructions::initialize_deque::process(program_id, accounts, num_sectors)?;
         }
         InstructionTag::Resize => {
             let num_sectors = ResizeInstructionData::unpack(instruction_data)?.num_sectors;

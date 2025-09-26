@@ -33,10 +33,12 @@ impl TryFrom<u8> for MarketChoice {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
-#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(not(target_os = "solana"), derive(Eq, PartialEq))]
 pub enum InstructionTag {
-    Initialize,
+    InitializeDeque,
+    InitializeEventAuthority,
+    ResizeEventAuthority,
     Resize,
     Deposit,
     Withdraw,
@@ -44,16 +46,19 @@ pub enum InstructionTag {
 }
 
 impl_tags! {
-    InitializeInstructionData    => InstructionTag::Initialize,
-    DepositInstructionData       => InstructionTag::Deposit,
-    WithdrawInstructionData      => InstructionTag::Withdraw,
-    ResizeInstructionData        => InstructionTag::Resize,
-    FlushEventLogInstructionData => InstructionTag::FlushEventLog,
+    InitializeDequeInstructionData           => InstructionTag::InitializeDeque,
+    InitializeEventAuthorityInstructionData  => InstructionTag::InitializeEventAuthority,
+    ResizeEventAuthorityInstructionData      => InstructionTag::ResizeEventAuthority,
+    DepositInstructionData                   => InstructionTag::Deposit,
+    WithdrawInstructionData                  => InstructionTag::Withdraw,
+    ResizeInstructionData                    => InstructionTag::Resize,
+    FlushEventLogInstructionData             => InstructionTag::FlushEventLog,
 }
 
 #[cfg(not(target_os = "solana"))]
 pub enum DequeInstruction {
-    Initialize(InitializeInstructionData),
+    InitializeDeque(InitializeDequeInstructionData),
+    InitializeEventAuthority(InitializeEventAuthorityInstructionData),
     Deposit(DepositInstructionData),
     Withdraw(WithdrawInstructionData),
     Resize(ResizeInstructionData),
@@ -64,7 +69,8 @@ pub enum DequeInstruction {
 impl DequeInstruction {
     pub fn pack(&self) -> Vec<u8> {
         match self {
-            DequeInstruction::Initialize(data) => data.pack().to_vec(),
+            DequeInstruction::InitializeDeque(data) => data.pack().to_vec(),
+            DequeInstruction::InitializeEventAuthority(data) => data.pack().to_vec(),
             DequeInstruction::Deposit(data) => data.pack().to_vec(),
             DequeInstruction::Withdraw(data) => data.pack().to_vec(),
             DequeInstruction::Resize(data) => data.pack().to_vec(),
@@ -79,8 +85,8 @@ impl TryFrom<u8> for InstructionTag {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             // SAFETY: A valid enum variant is guaranteed with the match pattern.
-            0..5 => Ok(unsafe { core::mem::transmute::<u8, Self>(value) }),
-            _ => Err(DequeError::InvalidDiscriminant.into()),
+            0..7 => Ok(unsafe { core::mem::transmute::<u8, Self>(value) }),
+            _ => Err(DequeError::InvalidInstructionTag.into()),
         }
     }
 }
@@ -88,11 +94,11 @@ impl TryFrom<u8> for InstructionTag {
 #[repr(C)]
 #[derive(Clone)]
 #[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
-pub struct InitializeInstructionData {
+pub struct InitializeDequeInstructionData {
     pub num_sectors: u16,
 }
 
-impl Pack<3> for InitializeInstructionData {
+impl Pack<3> for InitializeDequeInstructionData {
     #[inline(always)]
     fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 3]) {
         dst[0].write(Self::TAG);
@@ -223,6 +229,40 @@ impl Pack<2> for WithdrawInstructionData {
 pub struct FlushEventLogInstructionData {}
 
 impl Pack<1> for FlushEventLogInstructionData {
+    #[inline(always)]
+    fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 1]) {
+        dst[0].write(Self::TAG);
+    }
+
+    #[inline(always)]
+    unsafe fn unpack_unchecked(_instruction_data: &[u8]) -> Self {
+        Self {}
+    }
+}
+
+#[repr(C)]
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
+pub struct InitializeEventAuthorityInstructionData {}
+
+impl Pack<1> for InitializeEventAuthorityInstructionData {
+    #[inline(always)]
+    fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 1]) {
+        dst[0].write(Self::TAG);
+    }
+
+    #[inline(always)]
+    unsafe fn unpack_unchecked(_instruction_data: &[u8]) -> Self {
+        Self {}
+    }
+}
+
+#[repr(C)]
+#[derive(Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug, Eq, PartialEq))]
+pub struct ResizeEventAuthorityInstructionData {}
+
+impl Pack<1> for ResizeEventAuthorityInstructionData {
     #[inline(always)]
     fn pack_into_slice(&self, dst: &mut [MaybeUninit<u8>; 1]) {
         dst[0].write(Self::TAG);

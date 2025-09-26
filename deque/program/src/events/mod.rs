@@ -91,7 +91,11 @@ pub trait EmittableEvent: Sized {
     fn try_from_slice(data: &[u8]) -> Result<Self, ProgramError> {
         require!(
             data.len() >= Self::LEN,
-            ProgramError::InvalidInstructionData
+            ProgramError::InvalidInstructionData,
+            "Expected data.len() >= Self::LEN aka {} >= {}, but data.len() == {}",
+            data.len(),
+            Self::LEN,
+            data.len()
         )?;
         Ok(Self::from_slice_unchecked(data))
     }

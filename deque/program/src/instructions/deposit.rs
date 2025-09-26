@@ -9,7 +9,7 @@ use crate::{
     instruction_enum::MarketChoice,
     shared::token_utils::vault_transfers::deposit_to_vault,
     state::{Deque, DequeNode, MarketEscrow},
-    utils::{from_sector_idx_mut, inline_resize},
+    utils::{from_sector_idx_mut, inline_deque_resize},
 };
 
 pub fn process(
@@ -71,7 +71,7 @@ pub fn process(
             // Resize (grow) the account if there's not enough space.
             if needs_resize {
                 msg!("Growing account by 1 sector");
-                inline_resize(deque_account, payer, system_program, 1)?;
+                inline_deque_resize(deque_account, payer, system_program, 1)?;
             }
 
             let mut data = deque_account.data.borrow_mut();

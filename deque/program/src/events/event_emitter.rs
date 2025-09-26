@@ -13,7 +13,7 @@ use crate::{
     instruction_enum::InstructionTag,
     seeds,
     shared::error::DequeError,
-    state::EphemeralEventLog,
+    state::{EphemeralEventLog, EPHEMERAL_EVENT_LOG_HEADER_SIZE},
     validation::{event_authority::EventAuthorityInfo, self_program::SelfProgramInfo},
 };
 
@@ -48,20 +48,17 @@ impl<'a, 'info> EventEmitter<'a, 'info> {
         // TODO: Fill this with meaningful data.
         HeaderEventData::new(triggering_instruction_tag, market, sender, 1, 10).write(&mut data)?;
 
-        // TODO: Tbh, this would be much simpler/more ergonomic if the lifetime of the
-        // ephemeral event log were tied to the EventAuthorityInfo struct.
-        // It'd be easy to call, would reduce boilerplate, and the lifetimes would automatically
-        // protect against double borrows (I believe).
-        // Cast the event authority's account data to a mutable ephemeral event log.
-        let mut event_authority_data = ctx
-            .event_authority
-            .info
-            .data
-            .try_borrow_mut()
-            .or(Err(DequeError::InvalidEventAuthorityBorrow))?;
+        // Reset the event authority's account data if it's going to be written to.
+        let should_reset =
+            ctx.event_authority.info.is_writable && !ctx.event_authority.info.data_is_empty();
 
-        // Initialize the ephemeral event log.
-        EphemeralEventLog::init(&mut event_authority_data)?;
+        if should_reset {
+            if let Ok(ref mut event_authority_data) =
+                &mut ctx.event_authority.info.try_borrow_mut_data()
+            {
+                EphemeralEventLog::from_bytes(event_authority_data)?.reset_bytes_written_count();
+            }
+        }
 
         Ok(Self {
             emit_instruction: Instruction {
@@ -85,8 +82,22 @@ impl<'a, 'info> EventEmitter<'a, 'info> {
             .data
             .try_borrow_mut()
             .or(Err(DequeError::InvalidEventAuthorityBorrow))?;
+
         let mut ephemeral_event_log =
             EphemeralEventLog::from_bytes_unchecked(&mut event_authority_data)?;
+
+        solana_program::msg!("writing {} bytes to the ephemeral event log");
+        {
+            solana_program::msg!(
+                "bytes bein---------------------------------------------------g: {:?}",
+                unsafe {
+                    core::slice::from_raw_parts(
+                        self.emit_instruction.data.as_ptr().add(FULL_HEADER_SIZE),
+                        self.emit_instruction.data.len() - FULL_HEADER_SIZE,
+                    )
+                }
+            );
+        }
 
         // TODO: As it stands, the data in the header is *not* actually duplicated.
         // This would have to be refactored to make sure that the CPI header data is always synced
@@ -98,6 +109,8 @@ impl<'a, 'info> EventEmitter<'a, 'info> {
                 self.emit_instruction.data.len() - FULL_HEADER_SIZE,
             )?;
         }
+
+        drop(event_authority_data);
 
         // Invoke the cpi to emit instruction data events.
         invoke_signed(

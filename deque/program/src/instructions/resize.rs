@@ -5,7 +5,7 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-use crate::utils::inline_resize;
+use crate::utils::inline_deque_resize;
 
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16) -> ProgramResult {
     msg!("Trying to add {} sectors.", num_sectors);
@@ -15,7 +15,7 @@ pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], num_sectors: u16)
     let deque_account = next_account_info(accounts_iter)?;
     let system_program = next_account_info(accounts_iter)?;
 
-    inline_resize(deque_account, payer_account, system_program, num_sectors)?;
+    inline_deque_resize(deque_account, payer_account, system_program, num_sectors)?;
 
     Ok(())
 }

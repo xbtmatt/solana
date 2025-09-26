@@ -7,8 +7,9 @@ use solana_program::{
 
 use crate::{
     seeds,
-    shared::error::DequeError,
+    shared::error::{DequeError, DequeProgramResult},
     state::{Deque, DequeNode, MarketEscrow, Stack, DEQUE_HEADER_SIZE},
+    validation::system_program::SystemProgramInfo,
 };
 
 /// The physical `sector` index in the slab of bytes dedicated to inner data for a type.
@@ -100,11 +101,11 @@ pub fn log_bytes(bytes: &[u8]) {
 }
 
 #[inline(always)]
-pub fn check_owned_and_writable(account: &AccountInfo) -> ProgramResult {
+pub fn check_owned_and_writable(account: &AccountInfo) -> DequeProgramResult {
     if account.owner.as_ref() != crate::ID.as_ref() {
-        Err(DequeError::AccountNotOwnedByProgram.into())
+        Err(DequeError::AccountNotOwnedByProgram)
     } else if !account.is_writable {
-        Err(DequeError::AccountIsNotWritable.into())
+        Err(DequeError::AccountIsNotWritable)
     } else {
         Ok(())
     }
@@ -126,8 +127,41 @@ pub fn check_derivations_and_get_bump(
     Ok(deque_bump)
 }
 
+pub fn fund_then_resize<'a, 'info>(
+    target: &'a AccountInfo<'info>,
+    payer: &'a AccountInfo<'info>,
+    system_program: &'a AccountInfo<'info>,
+    additional_space: usize,
+) -> DequeProgramResult {
+    check_owned_and_writable(target)?;
+
+    let current_size = target.data_len();
+    let current_lamports = target.lamports();
+    let target_space = current_size + additional_space;
+    let target_lamports_required = Rent::get()
+        .or(Err(DequeError::RentGetError))?
+        .minimum_balance(target_space);
+    let lamports_diff = target_lamports_required.saturating_sub(current_lamports);
+
+    if lamports_diff > 0 {
+        invoke(
+            &system_instruction::transfer(payer.key, target.key, lamports_diff),
+            &[payer.clone(), target.clone(), system_program.clone()],
+        )
+        .or(Err(DequeError::TransferError))?;
+    }
+
+    // "Memory used to grow is already zero-initialized upon program entrypoint and re-zeroing it wastes compute units."
+    // See: https://solana.com/developers/courses/program-optimization/program-architecture#data-optimization
+    target
+        .realloc(target_space, false)
+        .or(Err(DequeError::ReallocError))?;
+
+    Ok(())
+}
+
 #[inline(always)]
-pub fn inline_resize<'a, 'info>(
+pub fn inline_deque_resize<'a, 'info>(
     deque_account: &'a AccountInfo<'info>,
     payer_account: &'a AccountInfo<'info>,
     system_program: &'a AccountInfo<'info>,
@@ -136,31 +170,15 @@ pub fn inline_resize<'a, 'info>(
     if num_sectors < 1 {
         return Err(DequeError::MustBeGreaterThanOne.into());
     }
-    check_owned_and_writable(deque_account)?;
 
-    let deque_data = deque_account.try_borrow_mut_data()?;
-    let current_size = deque_data.len();
-    let current_lamports = deque_account.lamports();
-    let new_account_space = current_size + SECTOR_SIZE * (num_sectors as usize);
-    let new_lamports_required = Rent::get()?.minimum_balance(new_account_space);
-    let lamports_diff = new_lamports_required.saturating_sub(current_lamports);
+    let current_size = deque_account.data_len();
 
-    drop(deque_data);
-
-    if lamports_diff > 0 {
-        invoke(
-            &system_instruction::transfer(payer_account.key, deque_account.key, lamports_diff),
-            &[
-                payer_account.clone(),
-                deque_account.clone(),
-                system_program.clone(),
-            ],
-        )?;
-    }
-
-    // "Memory used to grow is already zero-initialized upon program entrypoint and re-zeroing it wastes compute units."
-    // See: https://solana.com/developers/courses/program-optimization/program-architecture#data-optimization
-    deque_account.realloc(new_account_space, false)?;
+    fund_then_resize(
+        deque_account,
+        payer_account,
+        system_program,
+        SECTOR_SIZE * (num_sectors as usize),
+    )?;
 
     // Now chain the old sectors to the new sectors in the stack of free nodes.
     let mut deque_data = deque_account.data.borrow_mut();

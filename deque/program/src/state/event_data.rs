@@ -7,7 +7,7 @@ use static_assertions::const_assert_eq;
 use crate::{
     shared::error::DequeError,
     syscalls::sol_memcpy_,
-    utils::{from_slab_bytes_mut, Slab},
+    utils::{from_slab_bytes_mut, write_bytes, Slab},
 };
 
 pub const EVENT_ACCOUNT_DISCRIMINANT: [u8; 8] = 0xbaadbaadf000000du64.to_le_bytes();
@@ -25,6 +25,7 @@ pub const EPHEMERAL_EVENT_LOG_HEADER_SIZE: usize = 16;
 
 #[repr(C)]
 #[derive(Pod, Zeroable, Copy, Clone)]
+#[cfg_attr(not(target_os = "solana"), derive(Debug))]
 pub struct EphemeralEventHeader {
     /// The account discriminant.
     discriminant: [u8; 8],
@@ -80,18 +81,29 @@ pub struct EphemeralEventLog<'a> {
 impl<'a> EphemeralEventLog<'a> {
     /// Construct a new, empty EventData with allocated but uninitialized (zerod out) account data.
     pub fn init(zerod_account_data: &'a mut [u8]) -> ProgramResult {
-        if zerod_account_data.len() != EVENT_DATA_ACCOUNT_SIZE_INVARIANT {
-            return Err(DequeError::EventAuthorityUnallocated.into());
+        // Only needs to be at least the header size in order to init.
+        if zerod_account_data.len() < EPHEMERAL_EVENT_LOG_HEADER_SIZE {
+            return Err(DequeError::EventAuthorityNotAllocated.into());
         }
 
-        let event_log = EphemeralEventLog::from_bytes_unchecked(zerod_account_data)?;
-        *event_log.header = EphemeralEventHeader::init();
+        let header = from_slab_bytes_mut(
+            &mut zerod_account_data[0..EPHEMERAL_EVENT_LOG_HEADER_SIZE],
+            0_usize,
+        )?;
+        *header = EphemeralEventHeader::init();
 
         Ok(())
     }
 
+    pub fn reset_bytes_written_count(&mut self) {
+        self.header.set_written_bytes(0);
+    }
+
     /// Cast a byte vector to an event log and check the header's discriminant.
     pub fn from_bytes(data: &'a mut [u8]) -> Result<Self, ProgramError> {
+        if data.len() != EVENT_DATA_ACCOUNT_SIZE_INVARIANT {
+            return Err(DequeError::EventAuthorityNotFullyAllocated.into());
+        }
         let (header_slab, event_data) = data.split_at_mut(EPHEMERAL_EVENT_LOG_HEADER_SIZE);
         let header = from_slab_bytes_mut::<EphemeralEventHeader>(header_slab, 0_usize)?;
         header.verify_discriminant()?;
@@ -101,6 +113,9 @@ impl<'a> EphemeralEventLog<'a> {
 
     /// Cast a byte vector to an event log without checking the header's discriminant.
     pub fn from_bytes_unchecked(data: &'a mut [u8]) -> Result<Self, ProgramError> {
+        if data.len() != EVENT_DATA_ACCOUNT_SIZE_INVARIANT {
+            return Err(DequeError::EventAuthorityNotFullyAllocated.into());
+        }
         let (header_slab, event_data) = data.split_at_mut(EPHEMERAL_EVENT_LOG_HEADER_SIZE);
         let header = from_slab_bytes_mut::<EphemeralEventHeader>(header_slab, 0_usize)?;
         debug_assert!(header.get_written_bytes() as usize <= event_data.len());
@@ -139,6 +154,7 @@ impl<'a> EphemeralEventLog<'a> {
             new_event_data,
             num_bytes as u64,
         );
+
         self.header.set_written_bytes(new_written_bytes as u32);
 
         debug_assert!(self.header.get_written_bytes() as usize <= self.event_data.len());
