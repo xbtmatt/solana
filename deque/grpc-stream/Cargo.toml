@@ -1,0 +1,14 @@
+[package]
+name = "grpc-stream"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+deque = { path = "../program", features = ["no-entrypoint"] }
+deque-client = { path = "../client" }
+futures = "0.3.31"
+tokio = { workspace = true, features = ["full"] }
+tonic = "0.14.2"
+yellowstone-grpc-client = "9.0.0"
+yellowstone-grpc-proto = "9.0.0"

@@ -52,12 +52,14 @@ pub fn maybe_unpack_events(inner_ixn: &ParsedInnerInstruction) -> Option<Vec<Deq
         return None;
     };
 
-    let (tag, data) = ixn.data.split_first()?;
-    let instruction_tag = InstructionTag::try_from(*tag).ok()?;
+    maybe_unpack_event_bytes_with_tag(&ixn.data)
+}
 
+pub fn maybe_unpack_event_bytes_with_tag(data_with_tag: &[u8]) -> Option<Vec<DequeEvent<'_>>> {
+    let (tag, data) = data_with_tag.split_first()?;
+    let instruction_tag = InstructionTag::try_from(*tag).ok()?;
     matches!(instruction_tag, InstructionTag::FlushEventLog)
-        .then(|| unpack_event_bytes(data).ok())
-        .flatten()
+        .then_some(unpack_event_bytes(data).ok()?)
 }
 
 /// Unpacks a slab of bytes into deque events.
