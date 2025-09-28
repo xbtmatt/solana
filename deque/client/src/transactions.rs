@@ -11,8 +11,6 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-use crate::{tokens::get_token_balance, views::inspect_account};
-
 pub async fn fund_account(rpc: &RpcClient, keypair: Option<Keypair>) -> anyhow::Result<Keypair> {
     let payer = match keypair {
         Some(kp) => kp,
@@ -20,7 +18,7 @@ pub async fn fund_account(rpc: &RpcClient, keypair: Option<Keypair>) -> anyhow::
     };
 
     let airdrop_signature = rpc
-        .request_airdrop(&payer.pubkey(), 2_000_000_000)
+        .request_airdrop(&payer.pubkey(), 10_000_000_000)
         .context("Failed to request airdrop")?;
 
     let mut i = 0;

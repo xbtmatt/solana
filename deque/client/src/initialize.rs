@@ -27,16 +27,6 @@ pub fn initialize_market_and_event_authority(
     )
     .context("Should initialize the event authority")?;
 
-    for _i in 1..10 {
-        send_txn(
-            rpc,
-            payer,
-            &[payer],
-            vec![ctx.resize_event_authority_ixn(payer)],
-            "add size to event authority account".to_string(),
-        )?;
-    }
-
     let init_num_sectors = 0;
 
     send_txn(
