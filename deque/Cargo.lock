@@ -1535,6 +1535,7 @@ dependencies = [
  "deque",
  "deque-client",
  "futures",
+ "solana-sdk",
  "tokio",
  "tonic",
  "yellowstone-grpc-client",

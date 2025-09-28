@@ -1,10 +1,10 @@
-use deque::{instruction_enum::InstructionTag, seeds::event_authority};
-use deque_client::events::maybe_unpack_event_bytes_with_tag;
+use deque::seeds::event_authority;
 use futures::StreamExt;
+use grpc_stream::parse_update::parse_update;
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
 use yellowstone_grpc_client::GeyserGrpcClient;
-use yellowstone_grpc_proto::{geyser::subscribe_update::UpdateOneof, prelude::*};
+use yellowstone_grpc_proto::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -52,40 +52,7 @@ async fn main() -> anyhow::Result<()> {
         match message {
             Ok(msg) => {
                 if let Some(update) = msg.update_oneof {
-                    match update {
-                        UpdateOneof::Account(acc) => {
-                            if let Some(account) = acc.account {
-                                println!("Account data: {:?}", &account.data[0..100]);
-                            }
-                        }
-                        UpdateOneof::Transaction(txn) => {
-                            if let Some(txn) = txn.transaction {
-                                txn.meta.inspect(|meta| {
-                                    for inner_instructions in meta.inner_instructions.iter() {
-                                        for instruction in inner_instructions.instructions.iter() {
-                                            // TODO: Need to match this up with the program ID so we can check easily.
-                                            // then we can do: if instruction.program_id_index...
-                                            if let Some(events) =
-                                                maybe_unpack_event_bytes_with_tag(&instruction.data)
-                                            {
-                                                println!("{:#?}", events);
-                                            }
-                                        }
-                                    }
-                                });
-
-                                txn.transaction.inspect(|txn| {
-                                    txn.message.as_ref().inspect(|msg| {
-                                        println!(
-                                            "compiled txn instructions {:#?}",
-                                            msg.instructions
-                                        )
-                                    });
-                                });
-                            }
-                        }
-                        _ => (),
-                    }
+                    parse_update(update);
                 }
             }
             Err(error) => {

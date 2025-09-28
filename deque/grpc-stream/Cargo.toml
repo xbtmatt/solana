@@ -8,6 +8,7 @@ anyhow.workspace = true
 deque = { path = "../program", features = ["no-entrypoint"] }
 deque-client = { path = "../client" }
 futures = "0.3.31"
+solana-sdk.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tonic = "0.14.2"
 yellowstone-grpc-client = "9.0.0"
