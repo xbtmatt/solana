@@ -1,17 +1,13 @@
 use solana_program::{
-    account_info::AccountInfo,
-    entrypoint::{ProgramResult, MAX_PERMITTED_DATA_INCREASE},
-    msg,
-    program::invoke_signed,
-    pubkey::Pubkey,
-    rent::Rent,
-    system_instruction,
-    sysvar::Sysvar,
+    account_info::AccountInfo, entrypoint::ProgramResult, msg, program::invoke_signed,
+    pubkey::Pubkey, rent::Rent, system_instruction, sysvar::Sysvar,
 };
 
 use crate::{
-    context::event_authority_ctx::EventAuthorityContext, seeds::event_authority,
-    shared::error::DequeError, state::EphemeralEventLog,
+    context::event_authority_ctx::EventAuthorityContext,
+    seeds::event_authority,
+    shared::error::DequeError,
+    state::{EphemeralEventLog, EVENT_DATA_ACCOUNT_SIZE},
 };
 
 /// This doesn't actually need to do anything- it merely flushes the passed instruction data.
@@ -24,7 +20,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
         return Ok(());
     }
 
-    let lamports_required = Rent::get()?.minimum_balance(MAX_PERMITTED_DATA_INCREASE);
+    let lamports_required = Rent::get()?.minimum_balance(EVENT_DATA_ACCOUNT_SIZE);
 
     // Create the event authority PDA.
     invoke_signed(
@@ -32,7 +28,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
             ctx.payer.key,
             ctx.event_authority.info.key,
             lamports_required,
-            MAX_PERMITTED_DATA_INCREASE as u64,
+            EVENT_DATA_ACCOUNT_SIZE as u64,
             program_id,
         ),
         &[

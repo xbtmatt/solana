@@ -13,7 +13,7 @@ use crate::{
     instruction_enum::InstructionTag,
     seeds,
     shared::error::DequeError,
-    state::{EphemeralEventLog, EPHEMERAL_EVENT_LOG_HEADER_SIZE},
+    state::EphemeralEventLog,
     validation::{event_authority::EventAuthorityInfo, self_program::SelfProgramInfo},
 };
 

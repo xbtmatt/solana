@@ -7,19 +7,14 @@ use static_assertions::const_assert_eq;
 use crate::{
     shared::error::DequeError,
     syscalls::sol_memcpy_,
-    utils::{from_slab_bytes_mut, write_bytes, Slab},
+    utils::{from_slab_bytes_mut, Slab},
 };
 
 pub const EVENT_ACCOUNT_DISCRIMINANT: [u8; 8] = 0xbaadbaadf000000du64.to_le_bytes();
 
-/// Equivalent to 10 CPI-based event log flushes.
-/// This is an invariant because we never resize.
-pub const EVENT_DATA_ACCOUNT_SIZE_INVARIANT: usize = (MAX_CPI_INSTRUCTION_DATA_LEN as usize) * 10;
+pub const EVENT_DATA_ACCOUNT_SIZE: usize = MAX_CPI_INSTRUCTION_DATA_LEN as usize;
 
-const_assert_eq!(
-    (EVENT_DATA_ACCOUNT_SIZE_INVARIANT < u32::MAX as usize),
-    true
-);
+const_assert_eq!((EVENT_DATA_ACCOUNT_SIZE < u32::MAX as usize), true);
 
 pub const EPHEMERAL_EVENT_LOG_HEADER_SIZE: usize = 16;
 
@@ -101,7 +96,7 @@ impl<'a> EphemeralEventLog<'a> {
 
     /// Cast a byte vector to an event log and check the header's discriminant.
     pub fn from_bytes(data: &'a mut [u8]) -> Result<Self, ProgramError> {
-        if data.len() != EVENT_DATA_ACCOUNT_SIZE_INVARIANT {
+        if data.len() < EVENT_DATA_ACCOUNT_SIZE {
             return Err(DequeError::EventAuthorityNotFullyAllocated.into());
         }
         let (header_slab, event_data) = data.split_at_mut(EPHEMERAL_EVENT_LOG_HEADER_SIZE);
@@ -113,7 +108,7 @@ impl<'a> EphemeralEventLog<'a> {
 
     /// Cast a byte vector to an event log without checking the header's discriminant.
     pub fn from_bytes_unchecked(data: &'a mut [u8]) -> Result<Self, ProgramError> {
-        if data.len() != EVENT_DATA_ACCOUNT_SIZE_INVARIANT {
+        if data.len() < EVENT_DATA_ACCOUNT_SIZE {
             return Err(DequeError::EventAuthorityNotFullyAllocated.into());
         }
         let (header_slab, event_data) = data.split_at_mut(EPHEMERAL_EVENT_LOG_HEADER_SIZE);
@@ -143,7 +138,7 @@ impl<'a> EphemeralEventLog<'a> {
             .ok_or(DequeError::InsufficientAccountSpace)?;
 
         // This check also implicitly means it's not bigger than u32::MAX.
-        if new_total_size > EVENT_DATA_ACCOUNT_SIZE_INVARIANT {
+        if new_total_size > EVENT_DATA_ACCOUNT_SIZE {
             return Err(DequeError::InsufficientAccountSpace.into());
         }
 

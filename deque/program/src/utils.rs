@@ -9,7 +9,6 @@ use crate::{
     seeds,
     shared::error::{DequeError, DequeProgramResult},
     state::{Deque, DequeNode, MarketEscrow, Stack, DEQUE_HEADER_SIZE},
-    validation::system_program::SystemProgramInfo,
 };
 
 /// The physical `sector` index in the slab of bytes dedicated to inner data for a type.
