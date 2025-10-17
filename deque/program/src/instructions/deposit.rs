@@ -34,7 +34,7 @@ pub fn process(
     // Try to find the trader in existing nodes.
     let mut data = deque_account.data.borrow_mut();
     // The deque's account discriminant is checked in `load`.
-    let deque = Deque::from_bytes_unchecked(&mut data)?;
+    let mut deque = Deque::from_bytes_unchecked(&mut data)?;
     let maybe_idx = deque
         .iter_nodes::<MarketEscrow>()
         .find(|(node, _)| node.trader.as_ref() == payer.key.as_ref())
@@ -66,7 +66,7 @@ pub fn process(
         }
         // Push a new node to the front of the deque.
         None => {
-            drop(data);
+            // drop(data);
 
             // Resize (grow) the account if there's not enough space.
             if needs_resize {
@@ -74,8 +74,8 @@ pub fn process(
                 inline_deque_resize(deque_account, payer, system_program, 1)?;
             }
 
-            let mut data = deque_account.data.borrow_mut();
-            let mut deque = Deque::from_bytes_unchecked(&mut data)?;
+            // let mut data = deque_account.data.borrow_mut();
+            // let mut deque = Deque::from_bytes_unchecked(&mut data)?;
 
             let escrow = match choice {
                 MarketChoice::Base => MarketEscrow::new(*payer.key, amount, 0),

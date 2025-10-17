@@ -70,15 +70,17 @@ pub fn withdraw_from_vault<'a, 'info>(
     ctx: &'a MarketChoiceContext<'a, 'info>,
     amount: u64,
 ) -> ProgramResult {
-    let mut data = ctx.deque_account.data.borrow_mut();
-    let deque = Deque::from_bytes_unchecked(&mut data)?;
-    let (base_mint, quote_mint, deque_bump) = (
-        deque.header.base_mint,
-        deque.header.quote_mint,
-        deque.header.deque_bump,
-    );
+    let (base_mint, quote_mint, deque_bump) = {
+        let mut data = ctx.deque_account.data.borrow_mut();
+        let deque = Deque::from_bytes_unchecked(&mut data)?;
+        (
+            deque.header.base_mint,
+            deque.header.quote_mint,
+            deque.header.deque_bump,
+        )
+    };
 
-    drop(data);
+    // drop(data);
 
     match ctx.token_program.program_type {
         TokenProgram::SplToken => invoke_signed(
